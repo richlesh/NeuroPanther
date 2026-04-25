@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, sans-serif;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
+
+    select, input {
+      width: 100%;
+      background: #3a3a3c;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: #0a84ff; }
+
+    .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+
+    button {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #cancel-btn { background: #3a3a3c; color: #e0e0e0; }
+    #save-btn   { background: #0a84ff; color: #fff; }
+    #api-key-link { font-size: 12px; color: #4da3ff; text-decoration: none; margin-top: 4px; display: inline-block; }
+    #api-key-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div>
+    <label>Vendor</label>
+    <select id="vendor"></select>
+  </div>
+  <div>
+    <label>Model</label>
+    <select id="model"></select>
+  </div>
+  <div>
+    <label>API Key</label>
+    <input id="apiKey" type="password" placeholder="Enter API key…">
+    <a id="api-key-link" href="#" target="_blank">Get API key…</a>
+  </div>
+  <div class="row">
+    <button id="cancel-btn">Cancel</button>
+    <button id="save-btn">Save</button>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+
+    const { shell } = require("electron");
+    const vendorSel = document.getElementById("vendor");
+    const modelSel  = document.getElementById("model");
+    const apiKeyIn  = document.getElementById("apiKey");
+    const apiKeyLink = document.getElementById("api-key-link");
+
+    let vendors, current;
+
+    ipcRenderer.invoke("settings-get-data").then(({ settings, VENDORS }) => {
+      vendors = VENDORS;
+      current = settings;
+
+      for (const [key, v] of Object.entries(vendors)) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = v.label;
+        vendorSel.appendChild(opt);
+      }
+
+      vendorSel.value = current.vendor;
+      populateModels(current.vendor);
+      modelSel.value = current.model;
+      apiKeyIn.value = current.apiKeys[current.vendor] || "";
+      updateLink(current.vendor);
+    });
+
+    function updateLink(vendor) {
+      apiKeyLink.href = vendors[vendor].apiKeyUrl;
+    }
+
+    function populateModels(vendor) {
+      modelSel.innerHTML = "";
+      for (const m of vendors[vendor].models) {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        modelSel.appendChild(opt);
+      }
+    }
+
+    vendorSel.addEventListener("change", () => {
+      populateModels(vendorSel.value);
+      apiKeyIn.value = current.apiKeys[vendorSel.value] || "";
+      updateLink(vendorSel.value);
+    });
+
+    apiKeyLink.addEventListener("click", e => {
+      e.preventDefault();
+      shell.openExternal(apiKeyLink.href);
+    });
+
+    document.getElementById("save-btn").addEventListener("click", () => {
+      current.apiKeys[vendorSel.value] = apiKeyIn.value;
+      ipcRenderer.invoke("settings-save", {
+        vendor: vendorSel.value,
+        model: modelSel.value,
+        apiKeys: current.apiKeys
+      });
+    });
+
+    document.getElementById("cancel-btn").addEventListener("click", () => {
+      ipcRenderer.invoke("settings-cancel");
+    });
+  </script>
+</body>
+</html>

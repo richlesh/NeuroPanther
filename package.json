@@ -1,0 +1,56 @@
+{
+  "name": "chatbot",
+  "productName": "LLM Chatbot",
+  "version": "1.0.0",
+  "description": "Chatbot for various LLMs",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac:x64":   "electron-builder --mac   --x64",
+    "dist:mac:arm64": "electron-builder --mac   --arm64",
+    "dist:win:x64":   "electron-builder --win   --x64",
+    "dist:win:arm64": "electron-builder --win   --arm64",
+    "dist:linux:x64":   "electron-builder --linux --x64",
+    "dist:linux:arm64": "electron-builder --linux --arm64",
+    "dist:all": "npm run dist:mac:x64 && npm run dist:mac:arm64 && npm run dist:win:x64 && npm run dist:win:arm64 && npm run dist:linux:x64 && npm run dist:linux:arm64"
+  },
+  "build": {
+    "appId": "com.richardlesh.llmchatbot",
+    "productName": "LLM Chatbot",
+    "icon": "app_icon",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "files": [
+      "*.js",
+      "*.html",
+      "*.json",
+      "*.png",
+      "*.icns",
+      "node_modules/**"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "keywords": [],
+  "author": "Richard Lesh",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "highlight.js": "^11.11.1",
+    "marked": "^18.0.2",
+    "openai": "^6.34.0"
+  }
+}

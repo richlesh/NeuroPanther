@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LLM Chatbot</title>
+  <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      font-family: -apple-system, sans-serif;
+      background: #1e1e1e;
+      color: #e0e0e0;
+    }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .msg {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .msg.user      { align-self: flex-end; background: #0a84ff; color: #fff; white-space: pre-wrap; }
+    .msg.assistant { align-self: flex-start; background: #2c2c2e; }
+    .msg.error     { align-self: flex-start; background: #5a1a1a; color: #ff6b6b; }
+
+    .msg.assistant p { margin: 0 0 8px; }
+    .msg.assistant p:last-child { margin-bottom: 0; }
+    .msg.assistant ul, .msg.assistant ol { margin: 0 0 8px 20px; }
+    .msg.assistant li { margin-bottom: 2px; }
+    .msg.assistant h1, .msg.assistant h2, .msg.assistant h3 { margin: 8px 0 4px; }
+    .msg.assistant code { background: #1a1a1a; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+    .msg.assistant pre { margin: 8px 0; border-radius: 8px; overflow-x: auto; }
+    .msg.assistant pre code { background: none; padding: 0; font-size: 13px; }
+    .msg.assistant blockquote { border-left: 3px solid #555; padding-left: 10px; color: #aaa; margin: 6px 0; }
+    .msg.assistant a { color: #4da3ff; }
+
+    .msg img { max-width: 100%; border-radius: 10px; display: block; margin-top: 6px; }
+
+    .msg-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #3a3a3c;
+    }
+    .msg-actions button {
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s, background 0.15s;
+    }
+    .msg-actions button:hover   { color: #e0e0e0; background: #3a3a3c; }
+    .msg-actions button.speaking { color: #0a84ff; }
+
+    #image-preview-wrap {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: #252525;
+      border-top: 1px solid #333;
+    }
+    #image-preview-wrap img { height: 48px; border-radius: 6px; }
+    #image-preview-wrap button {
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+    #image-preview-wrap button:hover { color: #ff453a; }
+
+    #input-area {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid #333;
+      background: #252525;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #3a3a3c;
+      color: #aaa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s, color 0.2s;
+    }
+    .icon-btn:hover { background: #4a4a4e; color: #e0e0e0; }
+    .icon-btn.active { background: #0a84ff; color: #fff; }
+    .icon-btn svg { pointer-events: none; }
+
+    #prompt {
+      flex: 1;
+      resize: none;
+      background: #3a3a3c;
+      color: #e0e0e0;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-height: 120px;
+      outline: none;
+    }
+
+    #send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      background: #0a84ff;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    #send-btn:hover    { background: #0070d8; }
+    #send-btn:disabled { background: #444; cursor: default; }
+    #send-btn svg { pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="chat"></div>
+
+  <div id="image-preview-wrap">
+    <img id="image-preview">
+    <button id="image-clear-btn" title="Remove image">✕</button>
+  </div>
+
+  <div id="input-area">
+    <button class="icon-btn" id="attach-btn" title="Attach image">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="imagine-btn" title="Generate image with DALL-E">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+    </button>
+    <textarea id="prompt" rows="1" placeholder="Message…"></textarea>
+    <button id="send-btn" title="Send">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 10 4 15 9 20"/>
+        <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+      </svg>
+    </button>
+  </div>
+
+  <input type="file" id="file-input" accept="image/*" style="display:none">
+
+  <script>
+    const { ipcRenderer, shell } = require("electron");
+    const { marked } = require("marked");
+    const hljs = require("highlight.js");
+
+    marked.use({
+      renderer: (() => {
+        const r = new marked.Renderer();
+        r.code = ({ text, lang }) => {
+          const language = hljs.getLanguage(lang) ? lang : "plaintext";
+          return `<pre><code class="hljs language-${language}">${hljs.highlight(text, { language }).value}</code></pre>`;
+        };
+        return r;
+      })()
+    });
+
+    const chat        = document.getElementById("chat");
+    const prompt      = document.getElementById("prompt");
+    const sendBtn     = document.getElementById("send-btn");
+    const attachBtn   = document.getElementById("attach-btn");
+    const imagineBtn  = document.getElementById("imagine-btn");
+    const fileInput   = document.getElementById("file-input");
+    const previewWrap = document.getElementById("image-preview-wrap");
+    const previewImg  = document.getElementById("image-preview");
+    const clearBtn    = document.getElementById("image-clear-btn");
+
+    // right-click context menu on any image in the chat
+    chat.addEventListener("contextmenu", e => {
+      if (e.target.tagName !== "IMG") return;
+      e.preventDefault();
+      ipcRenderer.invoke("image-context-menu", e.target.src);
+    });
+
+    const history = [];
+    let attachedImage = null; // { base64, mediaType }
+    let imagineMode = false;
+
+    // --- image attach ---
+    attachBtn.addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        const base64 = dataUrl.split(",")[1];
+        attachedImage = { base64, mediaType: file.type };
+        previewImg.src = dataUrl;
+        previewWrap.style.display = "flex";
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = "";
+    });
+
+    clearBtn.addEventListener("click", clearImage);
+    function clearImage() {
+      attachedImage = null;
+      previewWrap.style.display = "none";
+      previewImg.src = "";
+    }
+
+    // --- imagine mode toggle ---
+    imagineBtn.addEventListener("click", () => {
+      imagineMode = !imagineMode;
+      imagineBtn.classList.toggle("active", imagineMode);
+      prompt.placeholder = imagineMode ? "Describe an image to generate…" : "Message…";
+    });
+
+    // --- send ---
+    async function send() {
+      const text = prompt.value.trim();
+      if (!text) return;
+
+      prompt.value = "";
+      prompt.style.height = "auto";
+      sendBtn.disabled = true;
+
+      if (imagineMode) {
+        addMessage("user", `🎨 ${text}`);
+        const thinking = addMessage("assistant", "…");
+        try {
+          const url = await ipcRenderer.invoke("generate-image", text);
+          thinking.innerHTML = "";
+          const img = document.createElement("img");
+          img.src = url;
+          thinking.appendChild(img);
+          thinking.appendChild(makeImageDownloadAction(url, text));
+        } catch (err) {
+          thinking.className = "msg error";
+          thinking.textContent = "Error: " + err.message;
+        }
+      } else if (attachedImage) {
+        const image = attachedImage;
+        const dataUrl = `data:${image.mediaType};base64,${image.base64}`;
+        clearImage();
+
+        // show image + text in chat
+        const userDiv = document.createElement("div");
+        userDiv.className = "msg user";
+        const imgEl = document.createElement("img");
+        imgEl.src = dataUrl;
+        imgEl.style.maxWidth = "200px";
+        userDiv.appendChild(imgEl);
+        if (text) {
+          const p = document.createElement("div");
+          p.textContent = text;
+          p.style.marginTop = "6px";
+          userDiv.appendChild(p);
+        }
+        chat.appendChild(userDiv);
+        chat.scrollTop = chat.scrollHeight;
+
+        const thinking = addMessage("assistant", "…");
+        try {
+          const reply = await ipcRenderer.invoke("chat-with-image", { image, text });
+          thinking.innerHTML = marked.parse(reply);
+          thinking.appendChild(makeActions(reply));
+          history.push({ role: "user", content: text || "What is in this image?" });
+          history.push({ role: "assistant", content: reply });
+        } catch (err) {
+          thinking.className = "msg error";
+          thinking.textContent = "Error: " + err.message;
+        }
+      } else {
+        addMessage("user", text);
+        history.push({ role: "user", content: text });
+        const thinking = addMessage("assistant", "…");
+        try {
+          const reply = await ipcRenderer.invoke("chat", history);
+          thinking.innerHTML = marked.parse(reply);
+          thinking.appendChild(makeActions(reply));
+          history.push({ role: "assistant", content: reply });
+        } catch (err) {
+          thinking.className = "msg error";
+          thinking.textContent = "Error: " + err.message;
+        }
+      }
+
+      chat.scrollTop = chat.scrollHeight;
+      sendBtn.disabled = false;
+      prompt.focus();
+    }
+
+    function addMessage(role, text) {
+      const div = document.createElement("div");
+      div.className = `msg ${role}`;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+
+    function makeActions(plainText) {
+      const bar = document.createElement("div");
+      bar.className = "msg-actions";
+
+      const copy = btn("Copy", `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`);
+      copy.addEventListener("click", () => navigator.clipboard.writeText(plainText));
+
+      const speak = btn("Speak", `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`);
+      speak.addEventListener("click", () => {
+        if (speechSynthesis.speaking) {
+          speechSynthesis.cancel();
+          speak.classList.remove("speaking");
+          return;
+        }
+        const utter = new SpeechSynthesisUtterance(plainText);
+        utter.onend = () => speak.classList.remove("speaking");
+        speak.classList.add("speaking");
+        speechSynthesis.speak(utter);
+      });
+
+      bar.append(copy, speak);
+      return bar;
+    }
+
+    function makeImageDownloadAction(url, promptText) {
+      const bar = document.createElement("div");
+      bar.className = "msg-actions";
+      const dl = btn("Download image", `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`);
+      dl.addEventListener("click", () => ipcRenderer.invoke("download-image", { url, promptText }));
+      bar.appendChild(dl);
+      return bar;
+    }
+
+    function btn(title, svgHtml) {
+      const b = document.createElement("button");
+      b.title = title;
+      b.innerHTML = svgHtml;
+      return b;
+    }
+
+    sendBtn.addEventListener("click", send);
+
+    prompt.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+
+    prompt.addEventListener("input", () => {
+      prompt.style.height = "auto";
+      prompt.style.height = Math.min(prompt.scrollHeight, 120) + "px";
+    });
+  </script>
+</body>
+</html>
