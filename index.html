@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>LLM Chatbot</title>
+  <title>OmniLLM</title>
   <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css" media="screen">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono+NL:ital,wght@0,100..800;1,100..800&display=swap">
   <style>
@@ -448,7 +448,7 @@
       if (val) {
         tab.title = val;
         titleSpan.textContent = val;
-        if (id === activeTabId) document.title = "LLM Chatbot";
+        if (id === activeTabId) document.title = "OmniLLM";
       }
       titleInput.style.display = "none";
       titleSpan.style.display = "";
@@ -485,7 +485,7 @@
       activeTabId = id;
       const tab = tabs[id];
       tab.domEl.classList.add("active");
-      document.title = "LLM Chatbot";
+      document.title = "OmniLLM";
 
       // attach this tab's container
       chatEl.appendChild(tab.container);
@@ -941,7 +941,7 @@
       if (data.title) {
         tab.title = data.title;
         tab.domEl.querySelector(".tab-title").textContent = data.title;
-        document.title = "LLM Chatbot";
+        document.title = "OmniLLM";
       }
       markSaved(id);
     });

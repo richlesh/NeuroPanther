@@ -8,10 +8,10 @@ const { load, save, VENDORS } = require("./settings");
 
 const appIcon = nativeImage.createFromPath(path.join(__dirname, "app_icon.icns"));
 
-app.name = "LLM Chatbot";
+app.name = "OmniLLM";
 
 app.setAboutPanelOptions({
-  applicationName: "LLM Chatbot",
+  applicationName: "OmniLLM",
   applicationVersion: "1.0",
   credits: `by Richard Lesh\nBuilt with Electron v${process.versions.electron}`,
   website: "https://github.com/richlesh/LLM-Chatbot",
@@ -61,7 +61,7 @@ function buildMenu() {
     {
       label: app.name,
       submenu: [
-        { label: "About LLM Chatbot", click: showAbout },
+        { label: "About OmniLLM", click: showAbout },
         { type: "separator" },
         { label: "Settings…", click: openSettings },
         { type: "separator" },
@@ -347,7 +347,7 @@ ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model:
 ipcMain.handle("save-temp-image", (_event, { base64, mediaType }) => {
   const os = require("os");
   const ext = mediaType.split("/")[1] || "png";
-  const tempPath = path.join(os.tmpdir(), `llm-chatbot-img-${Date.now()}.${ext}`);
+  const tempPath = path.join(os.tmpdir(), `omnillm-img-${Date.now()}.${ext}`);
   fs.writeFileSync(tempPath, Buffer.from(base64, "base64"));
   return tempPath;
 });

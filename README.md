@@ -1,4 +1,4 @@
-# LLM Chatbot
+# OmniLLM Chatbot v1.1.0
 
 A cross-platform desktop chatbot application built with Electron that supports multiple AI vendors and models.
 
@@ -16,6 +16,15 @@ Connect to any of the following AI providers:
 - **DeepSeek** — DeepSeek Chat, DeepSeek Reasoner
 - **Alibaba** — Qwen Max, Qwen Plus, Qwen Turbo
 - **Meta** — Llama 3.3 70B, Llama 3.1 8B
+
+### Tabbed Windows
+- Run multiple independent chats simultaneously using tabs
+- Open a new tab with the **+** button or **Cmd/Ctrl+T**
+- Close a tab with **Cmd/Ctrl+W** or the × button on the tab
+- Double-click a tab title to rename it
+- Drag tabs between windows to reorganize chats
+- Each tab maintains its own conversation history, vendor, and model selection
+- Unsaved tabs are marked with a **•** indicator; you are prompted to save before closing
 
 ### Chat
 - Scrolling chat history with user and assistant message bubbles
@@ -50,7 +59,7 @@ Right-click any image in the chat to:
 - Select your **vendor** and **model** from dropdown menus
 - Each vendor stores its own **API key** separately
 - A direct link to each vendor's API key page is shown for convenience
-- Settings are saved to `~/.llm-chatbot-settings.json`
+- Settings are saved to `~/.omnillm-settings.json`
 
 ### Vendor Configuration
 Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code.
@@ -65,8 +74,8 @@ Vendors, models, and API key URLs are defined in `config.json` making it easy to
 
 ### Setup
 ```bash
-git clone https://github.com/richlesh/LLM-Chatbot.git
-cd LLM-Chatbot
+git clone https://github.com/richlesh/OmniLLM.git
+cd OmniLLM
 npm install
 ```
 
@@ -75,7 +84,7 @@ npm install
 npm start
 ```
 
-On first launch, open **Chatbot → Settings…** to enter your API key for your chosen vendor.
+On first launch, open **OmniLLM → Settings…** to enter your API key for your chosen vendor.
 
 ---
 
