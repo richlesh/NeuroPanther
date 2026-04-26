@@ -35,11 +35,14 @@
       "target": "nsis"
     },
     "linux": {
-      "target": "AppImage"
+      "target": [
+        { "target": "deb",      "arch": ["x64", "arm64"] },
+        { "target": "rpm",      "arch": ["x64", "arm64"] }
+      ]
     }
   },
   "keywords": [],
-  "author": "Richard Lesh",
+  "author": { "name": "Richard Lesh", "email": "richlesh@github.com" },
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
