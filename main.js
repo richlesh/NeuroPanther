@@ -4,7 +4,20 @@ const Anthropic = require("@anthropic-ai/sdk");
 const path = require("path");
 const fs = require("fs");
 const https = require("https");
+const nodeCrypto = require("crypto");
 const { load, save, VENDORS } = require("./settings");
+const LICENSE_SALT = "GlowingCat-OmniLLM-2026";
+
+function expectedLicenseKey(userName) {
+  const hmac = nodeCrypto.createHmac("sha256", LICENSE_SALT);
+  hmac.update(userName.toLowerCase().trim());
+  return hmac.digest("hex").slice(0, 16).toUpperCase();
+}
+
+function isValidLicense(key, userName) {
+  if (!key || !userName) return false;
+  return key.toUpperCase() === expectedLicenseKey(userName);
+}
 
 const appIcon = nativeImage.createFromPath(path.join(__dirname, "app_icon.icns"));
 
@@ -14,7 +27,7 @@ app.setAboutPanelOptions({
   applicationName: "OmniLLM",
   applicationVersion: require("./package.json").version,
   credits: `by Richard Lesh\nBuilt with Electron v${process.versions.electron}`,
-  website: "https://github.com/richlesh/OmniLLM",
+  website: "https://glowingcatsoftware.com/OmniLLM.html",
   iconImage: appIcon
 });
 
@@ -65,6 +78,7 @@ function buildMenu() {
         { label: "About OmniLLM", click: showAbout },
         { type: "separator" },
         { label: "Settings…", click: openSettings },
+        { label: "License Key…", click: openLicense },
         { type: "separator" },
         { role: "quit" }
       ]
@@ -148,6 +162,38 @@ function buildMenu() {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+let licenseWin;
+
+function openLicense() {
+  if (licenseWin) return licenseWin.focus();
+  licenseWin = new BrowserWindow({
+    width: 360,
+    height: 260,
+    resizable: false,
+    parent: mainWin,
+    modal: true,
+    webPreferences: { nodeIntegration: true, contextIsolation: false }
+  });
+  licenseWin.setMenuBarVisibility(false);
+  licenseWin.loadFile("license.html");
+  licenseWin.webContents.once("did-finish-load", () => {
+    const { licenseKey, userName } = load();
+    licenseWin.webContents.send("license-data", { key: licenseKey || "", userName: userName || "" });
+  });
+  licenseWin.on("closed", () => { licenseWin = null; });
+}
+
+ipcMain.handle("license-save", (_e, { key, userName }) => {
+  if (!isValidLicense(key, userName)) return;
+  const settings = load();
+  settings.licenseKey = key.toUpperCase();
+  settings.userName   = userName;
+  save(settings);
+  licenseWin?.close();
+});
+
+ipcMain.handle("license-cancel", () => licenseWin?.close());
 
 function openSettings() {
   if (settingsWin) return settingsWin.focus();
@@ -322,7 +368,8 @@ ipcMain.handle("get-vendors-and-settings", (event) => {
 
 
 ipcMain.handle("settings-save", (_e, newSettings) => {
-  save(newSettings);
+  const existing = load();
+  save({ ...existing, ...newSettings });
   settingsWin?.close();
 });
 
@@ -398,12 +445,13 @@ ipcMain.handle("chat-with-image", async (_event, { tempPath, mediaType, text, ve
 ipcMain.handle("generate-image", async (_event, { promptText, vendor }) => {
   const { apiKeys } = load();
   if (!apiKeys?.[vendor]) throw new Error("You need to set the API key in Settings before this LLM vendor can be used.");
+  const vendorCfg = VENDORS[vendor];
 
   if (vendor === "google") {
     const { GoogleGenAI } = require("@google/genai");
     const ai = new GoogleGenAI({ apiKey: apiKeys.google });
     const res = await ai.models.generateImages({
-      model: "imagen-4.0-generate-001",
+      model: vendorCfg.imageModel,
       prompt: promptText,
       config: { numberOfImages: 1, outputMimeType: "image/png" }
     });
@@ -412,8 +460,8 @@ ipcMain.handle("generate-image", async (_event, { promptText, vendor }) => {
   }
 
   // OpenAI DALL-E - fetch and convert to base64 immediately so URL doesn't expire
-  const client = new OpenAI({ apiKey: apiKeys.openai });
-  const res = await client.images.generate({ model: "dall-e-3", prompt: promptText, n: 1, size: "1024x1024" });
+  const client = new OpenAI({ apiKey: apiKeys[vendor] });
+  const res = await client.images.generate({ model: vendorCfg.imageModel, prompt: promptText, n: 1, size: vendorCfg.imageSize });
   const imageUrl = res.data[0].url;
   const response = await fetch(imageUrl);
   const arrayBuffer = await response.arrayBuffer();
@@ -551,11 +599,34 @@ ipcMain.on("close-confirmed", (event) => {
   }
 });
 
+function showSplash() {
+  const splash = new BrowserWindow({
+    width: 320,
+    height: 340,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    frame: false,
+    icon: appIcon,
+    webPreferences: { nodeIntegration: true, contextIsolation: false }
+  });
+  splash.loadFile("splash.html");
+  splash.webContents.once("did-finish-load", () => {
+    splash.webContents.send("icon-path", path.join(__dirname, "app_icon.png"));
+    splash.webContents.send("app-version", require("./package.json").version);
+  });
+
+  ipcMain.once("splash-close", () => {
+    splash.close();
+    createWindow();
+  });
+}
+
 app.whenReady().then(() => {
   // Intercept every window's close to check for unsaved tabs
   app.on("browser-window-created", (_e, win) => {
     win.on("close", (e) => {
-      if (win.webContents.getURL().includes("settings") || win.webContents.getURL().includes("about")) return;
+      if (["settings", "about", "splash", "license"].some(p => win.webContents.getURL().includes(p))) return;
       if (windowsAwaitingClose.has(win.id)) {
         windowsAwaitingClose.delete(win.id);
         return; // confirmed — allow close
@@ -564,5 +635,10 @@ app.whenReady().then(() => {
       win.webContents.send("check-unsaved-before-close");
     });
   });
-  createWindow();
+  const { licenseKey, userName } = load();
+  if (isValidLicense(licenseKey, userName)) {
+    createWindow();
+  } else {
+    showSplash();
+  }
 });
