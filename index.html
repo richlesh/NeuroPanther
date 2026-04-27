@@ -420,7 +420,7 @@
       el.addEventListener("dragstart", e => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", id);
-        ipcRenderer.send("tab-drag-start", { tabId: id, state: serializeTab(id) });
+        ipcRenderer.send("tab-drag-start", { tabId: id, state: serializeTab(id), tabCount: Object.keys(tabs).length });
       });
       el.addEventListener("dragend", () => {
         ipcRenderer.send("tab-drag-end", { tabId: id });
@@ -543,8 +543,7 @@
 
       const remaining = Object.keys(tabs).map(Number);
       if (remaining.length === 0) {
-        // no tabs left — create a fresh one
-        createTab();
+        window.close();
       } else if (activeTabId === id) {
         // switch to adjacent tab
         const nextId = remaining[Math.min(idx, remaining.length - 1)];
@@ -609,7 +608,7 @@
     let allVendors = {};
     const rememberedModel = {};
 
-    ipcRenderer.invoke("get-vendors-and-settings").then(({ vendors, settings }) => {
+    ipcRenderer.invoke("get-vendors-and-settings").then(({ vendors, settings, pendingLoad }) => {
       allVendors = vendors;
       rememberedModel[settings.vendor] = settings.model;
       populateVendorSelect(vendors, settings.vendor, false);
@@ -621,8 +620,14 @@
         populateVendorSelect(allVendors, vendorSel.value, tab ? tab.imagineMode : false);
       });
 
-      // create the first tab after vendors are loaded
-      createTab();
+      if (pendingLoad) {
+        const id = createTab(pendingLoad.title || "New Chat", pendingLoad);
+        const tab = tabs[id];
+        if (pendingLoad.title) tab.domEl.querySelector(".tab-title").textContent = pendingLoad.title;
+        markSaved(id);
+      } else {
+        createTab();
+      }
     });
 
     function populateVendorSelectOnly(vendors, selectedVendor, imagineOnly) {
@@ -934,19 +939,7 @@
       if (activeTabId) await saveTab(activeTabId);
     });
 
-    ipcRenderer.on("load-chat-data", async (_event, data) => {
-      // load into a new tab
-      const id = createTab(data.title || "New Chat", data);
-      const tab = tabs[id];
-      if (data.title) {
-        tab.title = data.title;
-        tab.domEl.querySelector(".tab-title").textContent = data.title;
-        document.title = "OmniLLM";
-      }
-      markSaved(id);
-    });
-
-    // ── Window close check ─────────────────────────────────────────────────────
+// ── Window close check ─────────────────────────────────────────────────────
     ipcRenderer.on("check-unsaved-before-close", async () => {
       const unsavedTabs = Object.values(tabs).filter(t => !t.saved && t.chatLog.length > 0);
       if (unsavedTabs.length === 0) {

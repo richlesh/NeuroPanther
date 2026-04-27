@@ -19,6 +19,7 @@ app.setAboutPanelOptions({
 });
 
 let mainWin, settingsWin;
+const pendingLoadData = new Map();
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -103,11 +104,11 @@ function buildMenu() {
               properties: ["openFile"]
             });
             if (!filePaths?.length) return;
-            const data = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+            const raw = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+            const fileName = path.basename(filePaths[0], ".json");
+            const data = { ...raw, chatLog: raw.chatLog ?? raw.messages ?? [], title: fileName };
             const win = createWindow();
-            win.webContents.once("did-finish-load", () => {
-              win.webContents.send("load-chat-data", data);
-            });
+            pendingLoadData.set(win.id, data);
           }
         },
         { type: "separator" },
@@ -312,7 +313,12 @@ ipcMain.handle("get-models-for-vendor", async (_event, vendor) => {
 
 ipcMain.handle("settings-get-data", () => ({ settings: load(), VENDORS }));
 
-ipcMain.handle("get-vendors-and-settings", () => ({ vendors: VENDORS, settings: load() }));
+ipcMain.handle("get-vendors-and-settings", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const pending = win ? pendingLoadData.get(win.id) : null;
+  if (pending) pendingLoadData.delete(win.id);
+  return { vendors: VENDORS, settings: load(), pendingLoad: pending || null };
+});
 
 
 ipcMain.handle("settings-save", (_e, newSettings) => {
@@ -479,8 +485,8 @@ ipcMain.handle("image-context-menu", async (_event, src) => {
 // ── Tab drag-and-drop between windows ─────────────────────────────────────────
 let draggedTabState = null;  // { sourceWinId, tabId, state }
 
-ipcMain.on("tab-drag-start", (event, { tabId, state }) => {
-  draggedTabState = { sourceWinId: event.sender.id, tabId, state };
+ipcMain.on("tab-drag-start", (event, { tabId, state, tabCount }) => {
+  draggedTabState = { sourceWinId: event.sender.id, tabId, state, tabCount };
 });
 
 ipcMain.on("tab-drag-end", (event, { tabId }) => {
@@ -499,9 +505,13 @@ ipcMain.on("tab-drop-here", (event) => {
   }
   // Send state to target window
   event.sender.send("receive-tab", draggedTabState.state);
-  // Tell source window to remove the tab
+  // Tell source window to remove the tab, or close it if it was the only tab
   const sourceWin = BrowserWindow.fromId(draggedTabState.sourceWinId);
-  sourceWin?.webContents.send("remove-tab-after-drag", draggedTabState.tabId);
+  if (draggedTabState.tabCount === 1) {
+    sourceWin?.destroy();
+  } else {
+    sourceWin?.webContents.send("remove-tab-after-drag", draggedTabState.tabId);
+  }
   draggedTabState = null;
 });
 
