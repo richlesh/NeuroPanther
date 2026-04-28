@@ -32,9 +32,7 @@
       "category": "public.app-category.productivity",
       "target": "dmg",
       "identity": "RICHARD A LESH (MMZ3Y97NTP)",
-      "notarize": {
-        "teamId": "MMZ3Y97NTP"
-      }
+      "notarize": true
     },
     "win": {
       "target": "nsis"
