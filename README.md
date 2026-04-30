@@ -1,4 +1,4 @@
-# OmniLLM Chatbot v1.1.0
+# NeuroPanther Chat v1.2.0
 
 A cross-platform desktop chatbot application built with Electron that supports multiple AI vendors and models.
 
@@ -59,7 +59,7 @@ Right-click any image in the chat to:
 - Select your **vendor** and **model** from dropdown menus
 - Each vendor stores its own **API key** separately
 - A direct link to each vendor's API key page is shown for convenience
-- Settings are saved to `~/.omnillm-settings.json`
+- Settings are saved to `~/.neuropanther-settings.json`
 
 ### Vendor Configuration
 Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code.
@@ -74,8 +74,8 @@ Vendors, models, and API key URLs are defined in `config.json` making it easy to
 
 ### Setup
 ```bash
-git clone https://github.com/richlesh/OmniLLM.git
-cd OmniLLM
+git clone https://github.com/richlesh/NeuroPanther.git
+cd NeuroPanther
 npm install
 ```
 
@@ -84,7 +84,7 @@ npm install
 npm start
 ```
 
-On first launch, open **OmniLLM → Settings…** to enter your API key for your chosen vendor.
+On first launch, open **NeuroPanther → Settings…** to enter your API key for your chosen vendor.
 
 ---
 
