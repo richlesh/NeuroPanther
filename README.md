@@ -45,9 +45,11 @@ Connect to any of the following AI providers:
 
 ### Image Generation
 - Toggle **Generate Image** mode with the star button
-- Describe an image and DALL-E 3 generates a 1024×1024 image
+- Describe an image and OpenAI/gpt-image-1 or Google/imagen-4.0-generate-001
+- will generate a 1024×1024 image
 - Generated images are displayed inline in the chat
 - Download generated images via the download button or right-click menu
+- OpenAI/gpt-image-1 allows for fine-tuning of generated images or uploaded images
 
 ### Tabbed Windows
 - Run multiple independent chats simultaneously using tabs
@@ -62,6 +64,7 @@ Connect to any of the following AI providers:
 Each AI response includes:
 - **Copy** — copies the response text to the clipboard
 - **Speak** — reads the response aloud using text-to-speech; click again to stop
+- **Voice Input** - allows you to send voice input to the AI model
 
 ### Image Actions
 Click any image to enlarge it in the chat window.
@@ -70,6 +73,7 @@ Right-click any image in the chat to:
 - **Copy Image** — copies the image to the clipboard
 - **Save Image As…** — saves the image to disk via a native save dialog
 - **Zoom** — enlarges the image to fit the chat window
+
 ### Settings
 - Select your **vendor** and **model** from dropdown menus
 - Each vendor stores its own **API key** separately
