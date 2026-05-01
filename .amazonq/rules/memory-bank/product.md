@@ -4,7 +4,7 @@
 NeuroPanther is a cross-platform desktop chat application built with Electron that provides a unified interface for interacting with multiple AI vendors and models. It eliminates the need to switch between different web interfaces by consolidating access to major LLM providers in one native desktop app.
 
 ## Version
-1.2.0 (package.json) / 1.1.0 (README)
+1.3.0
 
 ## Key Features
 
