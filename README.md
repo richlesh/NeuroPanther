@@ -64,7 +64,7 @@ Connect to any of the following AI providers:
 Each AI response includes:
 - **Copy** — copies the response text to the clipboard
 - **Speak** — reads the response aloud using text-to-speech; click again to stop
-- **Voice Input** - allows you to send voice input to the AI model
+- **Voice Input** - allows you to send voice input to the AI model (requires OpenAI API key)
 
 ### Image Actions
 Click any image to enlarge it in the chat window.
