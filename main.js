@@ -458,7 +458,12 @@ ipcMain.handle("agent-execute-tool", async (_event, { tool, args }) => {
   try {
     if (tool === "read_file") {
       const p = resolveSafePath(workDir, args.path);
-      return { ok: true, result: fs.readFileSync(p, "utf8") };
+      const content = fs.readFileSync(p, "utf8");
+      const MAX = 8000;
+      if (content.length > MAX) {
+        return { ok: true, result: content.slice(0, MAX) + `\n\n[FILE TRUNCATED: ${content.length} chars total, showing first ${MAX}. File is too large to rewrite safely in one operation — use search_files to find specific sections instead.]` };
+      }
+      return { ok: true, result: content };
     }
     if (tool === "write_file") {
       const p = resolveSafePath(workDir, args.path);
