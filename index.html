@@ -2120,8 +2120,8 @@
       const userBubble = settings.userBubbleColor || "#5cda05";
       const aiBubble   = settings.aiBubbleColor   || "#2c2c2e";
       const accentDark = shadeColor(accent, -15);
-      const userText   = contrastColor(userBubble);
-      const aiText     = contrastColor(aiBubble);
+      const userText   = settings.userTextColor || contrastColor(userBubble);
+      const aiText     = settings.aiTextColor   || contrastColor(aiBubble);
       document.getElementById("theme").textContent = `:root {
         --accent: ${accent};
         --accent-dark: ${accentDark};

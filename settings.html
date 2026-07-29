@@ -185,6 +185,17 @@
       <input type="color" id="ai-bubble-color" style="height:36px;padding:2px 4px;">
     </div>
   </div>
+  <div style="display:flex;gap:12px;margin-top:8px;">
+    <div style="flex:1"></div>
+    <div style="flex:1">
+      <label>User Text</label>
+      <input type="color" id="user-text-color" style="height:36px;padding:2px 4px;">
+    </div>
+    <div style="flex:1">
+      <label>AI Text</label>
+      <input type="color" id="ai-text-color" style="height:36px;padding:2px 4px;">
+    </div>
+  </div>
 
   <div class="row buttons-row">
     <button id="cancel-btn">Cancel</button>
@@ -224,6 +235,8 @@
       document.getElementById("accent-color").value      = current.accentColor    || "#5cda05";
       document.getElementById("user-bubble-color").value = current.userBubbleColor || "#5cda05";
       document.getElementById("ai-bubble-color").value   = current.aiBubbleColor   || "#2c2c2e";
+      document.getElementById("user-text-color").value   = current.userTextColor   || "#ffffff";
+      document.getElementById("ai-text-color").value     = current.aiTextColor     || "#ffffff";
 
       const LANGUAGES = [
         "Afrikaans","Arabic","Bengali","Bulgarian","Catalan","Chinese (Simplified)",
@@ -433,11 +446,10 @@
       } else if (prev !== "ollama") {
         current.apiKeys[prev] = apiKeyIn.value;
       }
-      // Clear model and API key fields when switching vendors
+      // Load saved model and API key for the new vendor, or clear if not set
       modelSel.innerHTML = "";
       if (vendorSel.value !== "amazon" && vendorSel.value !== "microsoft" && vendorSel.value !== "ibm" && !vendorSel.value.startsWith("generic")) {
-        current.apiKeys[vendorSel.value] = current.apiKeys[vendorSel.value] || "";
-        apiKeyIn.value = "";
+        apiKeyIn.value = current.apiKeys[vendorSel.value] || "";
       }
       updateLink(vendorSel.value);
       vendorSel.dataset.prev = vendorSel.value;
@@ -542,7 +554,9 @@
         codeFontSize:     document.getElementById("code-font-size").value,
         accentColor:      document.getElementById("accent-color").value,
         userBubbleColor:  document.getElementById("user-bubble-color").value,
-        aiBubbleColor:    document.getElementById("ai-bubble-color").value
+        aiBubbleColor:    document.getElementById("ai-bubble-color").value,
+        userTextColor:    document.getElementById("user-text-color").value,
+        aiTextColor:      document.getElementById("ai-text-color").value
       });
     });
 
