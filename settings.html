@@ -433,9 +433,11 @@
       } else if (prev !== "ollama") {
         current.apiKeys[prev] = apiKeyIn.value;
       }
+      // Clear model and API key fields when switching vendors
+      modelSel.innerHTML = "";
       if (vendorSel.value !== "amazon" && vendorSel.value !== "microsoft" && vendorSel.value !== "ibm" && !vendorSel.value.startsWith("generic")) {
         current.apiKeys[vendorSel.value] = current.apiKeys[vendorSel.value] || "";
-        apiKeyIn.value = current.apiKeys[vendorSel.value];
+        apiKeyIn.value = "";
       }
       updateLink(vendorSel.value);
       vendorSel.dataset.prev = vendorSel.value;
