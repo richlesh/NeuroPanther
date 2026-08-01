@@ -19,7 +19,7 @@ function openExternal(url) {
   }
 }
 
-const appIcon = nativeImage.createFromPath(path.join(__dirname, "app_icon.icns"));
+const appIcon = nativeImage.createFromPath(path.join(__dirname, "resources", "app_icon.icns"));
 
 app.name = "NeuroPanther Chat";
 
@@ -117,7 +117,7 @@ function showAbout() {
     aboutWin.show();
   });
   aboutWin.webContents.once("did-finish-load", () => {
-    aboutWin.webContents.send("icon-path", path.join(__dirname, "app_icon.png"));
+    aboutWin.webContents.send("icon-path", path.join(__dirname, "resources", "app_icon.png"));
     aboutWin.webContents.send("app-version", require("./package.json").version);
     const { licenseKey, userName } = load();
     if (isValidLicense(licenseKey, userName)) aboutWin.webContents.send("licensed");
@@ -517,7 +517,15 @@ ipcMain.handle("get-vendors-and-settings", (event) => {
 });
 
 ipcMain.handle("get-config", () => {
-  try { return JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8")); } catch { return {}; }
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, "resources", "config.json"), "utf8")); } catch { return {}; }
+});
+
+ipcMain.handle("get-system-prompt", () => {
+  try {
+    return fs.readFileSync(path.join(__dirname, "resources", "system_prompt.md"), "utf8").trim();
+  } catch {
+    return "";
+  }
 });
 
 
@@ -1412,6 +1420,18 @@ ipcMain.handle("download-image", async (_event, { url, promptText }) => {
   }
 });
 
+ipcMain.handle("save-mermaid-svg", async (_event, svgContent) => {
+  const win = BrowserWindow.getFocusedWindow() || mainWin;
+  const { filePath } = await dialog.showSaveDialog(win, {
+    title: "Save Mermaid Diagram",
+    defaultPath: path.join(require("os").homedir(), "Downloads", "diagram.svg"),
+    filters: [{ name: "SVG Image", extensions: ["svg"] }]
+  });
+  if (!filePath) return { filePath: null };
+  fs.writeFileSync(filePath, svgContent, "utf-8");
+  return { filePath };
+});
+
 ipcMain.handle("image-context-menu", async (_event, src) => {
   const { Menu: CtxMenu, clipboard, nativeImage: ni } = require("electron");
   const menu = CtxMenu.buildFromTemplate([
@@ -1549,7 +1569,7 @@ function showSplash(nagOnly) {
   });
   splash.loadFile("splash.html");
   splash.webContents.once("did-finish-load", () => {
-    splash.webContents.send("icon-path", path.join(__dirname, "app_icon.png"));
+    splash.webContents.send("icon-path", path.join(__dirname, "resources", "app_icon.png"));
     splash.webContents.send("app-version", require("./package.json").version);
   });
 

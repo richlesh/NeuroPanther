@@ -1,7 +1,7 @@
 {
   "name": "neuropanther-chat",
   "productName": "NeuroPanther Chat",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "NeuroPanther Chat - Chat for various LLMs",
   "main": "main.js",
   "scripts": {
@@ -17,16 +17,14 @@
   "build": {
     "appId": "com.richardlesh.neuropanther-chat",
     "productName": "NeuroPanther Chat",
-    "icon": "app_icon",
+    "icon": "resources/app_icon",
     "artifactName": "NeuroPanther-Chat-${version}-${arch}.${ext}",
     "files": [
       "*.js",
       "*.html",
       "*.json",
-      "*.png",
-      "*.icns",
-      "*.ico",
       "fonts/**",
+      "resources/**",
       "node_modules/**"
     ],
     "mac": {
@@ -39,7 +37,7 @@
           "ext": "chat",
           "name": "NeuroPanther Chat",
           "role": "Editor",
-          "icon": "doc_icon.icns"
+          "icon": "resources/doc_icon.icns"
         }
       ]
     },
@@ -50,18 +48,18 @@
           "ext": "chat",
           "name": "NeuroPanther Chat",
           "role": "Editor",
-          "icon": "doc_icon.ico"
+          "icon": "resources/doc_icon.ico"
         }
       ]
     },
     "linux": {
-      "icon": "app_icon_256.png",
+      "icon": "resources/app_icon_256.png",
       "category": "Network",
       "fileAssociations": [
         {
           "ext": "chat",
           "name": "NeuroPanther Chat",
-          "icon": "doc_icon_256.png"
+          "icon": "resources/doc_icon_256.png"
         }
       ],
       "target": [
@@ -107,6 +105,7 @@
     "highlight.js": "^11.11.1",
     "katex": "^0.16.22",
     "marked": "^18.0.2",
+    "mermaid": "^11.16.0",
     "openai": "^6.34.0"
   }
 }

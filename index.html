@@ -582,6 +582,32 @@
     #send-btn:hover    { background: var(--accent-dark); }
     #send-btn:disabled { background: #444; cursor: default; }
     #send-btn svg { pointer-events: none; }
+
+    .mermaid { position: relative; }
+    .mermaid svg { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+    .mermaid-error { color: #ff6b6b; font-size: 12px; white-space: pre-wrap; }
+    .mermaid-toolbar {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .mermaid:hover .mermaid-toolbar { opacity: 1; }
+    .mermaid-toolbar button {
+      background: #444;
+      border: none;
+      color: #ccc;
+      border-radius: 5px;
+      padding: 4px 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mermaid-toolbar button:hover { background: #555; color: #fff; }
   </style>
 </head>
 <body>
@@ -654,6 +680,8 @@
     const { ipcRenderer, shell } = require("electron");
     const { marked } = require("marked");
     const hljs = require("highlight.js");
+    const mermaid = require("mermaid").default;
+    mermaid.initialize({ startOnLoad: false, theme: "dark", suppressErrorRendering: true });
 
     // Pre-warm speech synthesis voices (loads asynchronously on Linux)
     speechSynthesis.getVoices();
@@ -696,6 +724,10 @@
       renderer: (() => {
         const r = new marked.Renderer();
         r.code = ({ text, lang }) => {
+          if (lang === "mermaid") {
+            const id = "mermaid-" + Math.random().toString(36).slice(2, 10);
+            return `<div class="mermaid" data-mermaid-id="${id}">${text}</div>`;
+          }
           const language = hljs.getLanguage(lang) ? lang : "plaintext";
           return `<pre><code class="hljs language-${language}">${hljs.highlight(text, { language }).value}</code></pre>`;
         };
@@ -845,6 +877,7 @@
       if (restore) {
         // rebuild chat DOM directly (avoid innerHTML truncating large base64 image src)
         buildChatDom(restore.chatLog, container);
+        renderMermaidDiagrams(container);
       }
 
       switchTab(id);
@@ -1089,6 +1122,9 @@
     const rememberedModel = {};
     let defaultVendor = "";
     let displayModelActivity = true;
+    let baseSystemPrompt = "";
+
+    ipcRenderer.invoke("get-system-prompt").then(p => { baseSystemPrompt = p; });
 
     ipcRenderer.invoke("get-vendors-and-settings").then(async ({ vendors, settings, pendingLoad }) => {
       allVendors = vendors;
@@ -1619,6 +1655,7 @@
             thinking.classList.remove("thinking-indicator");
             thinking.innerHTML = marked.parse(reply);
             addCodeCopyButtons(thinking);
+            renderMermaidDiagrams(thinking);
             thinking.appendChild(makeActions(reply));
             tab.history.push({ role: "user", content: text || "What is in this image?" });
             tab.history.push({ role: "assistant", content: reply });
@@ -1630,7 +1667,7 @@
             if (tab.agentMode) {
               const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
               const langInstruction = tab.translateMode ? ` Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
-              const sysContent = `You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.${langInstruction}`;
+              const sysContent = `${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.${langInstruction}`;
               if (!tab.history.length || tab.history[0].role !== "system") {
                 tab.history.unshift({ role: "system", content: sysContent });
               } else {
@@ -1638,6 +1675,15 @@
               }
               await runAgentLoop(tab, tabId, vendor, model, thinking);
             } else {
+              if (baseSystemPrompt) {
+                const langInstruction = tab.translateMode ? ` Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
+                const sysContent = baseSystemPrompt + (langInstruction ? "\n\n" + langInstruction.trim() : "");
+                if (!tab.history.length || tab.history[0].role !== "system") {
+                  tab.history.unshift({ role: "system", content: sysContent });
+                } else {
+                  tab.history[0].content = sysContent;
+                }
+              }
               await runStreaming(tab, tabId, vendor, model, thinking);
             }
           }
@@ -1651,11 +1697,17 @@
       } else {
         addMessage("user", text, tabId);
         if (tab.translateMode) {
-          const sysContent = `You are a helpful assistant. Always respond in ${tab.toLang}, regardless of the language the user writes in.`;
+          const sysContent = `${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}Always respond in ${tab.toLang}, regardless of the language the user writes in.`;
           if (!tab.history.length || tab.history[0].role !== "system") {
             tab.history.unshift({ role: "system", content: sysContent });
           } else {
             tab.history[0].content = sysContent;
+          }
+        } else if (baseSystemPrompt) {
+          if (!tab.history.length || tab.history[0].role !== "system") {
+            tab.history.unshift({ role: "system", content: baseSystemPrompt });
+          } else {
+            tab.history[0].content = baseSystemPrompt;
           }
         }
         tab.history.push({ role: "user", content: text });
@@ -1667,7 +1719,7 @@
         if (tab.agentMode) {
           const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
           const langInstruction = tab.translateMode ? ` Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
-          const sysContent = `You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.${langInstruction}`;
+          const sysContent = `${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.${langInstruction}`;
           if (!tab.history.length || tab.history[0].role !== "system") {
             tab.history.unshift({ role: "system", content: sysContent });
           } else {
@@ -1714,7 +1766,7 @@
       if (role === "assistant" && text === "…") {
         div.classList.add("thinking-indicator");
         const img = document.createElement("img");
-        img.src = "app_icon.png";
+        img.src = "resources/app_icon.png";
         div.appendChild(img);
         const thinkText = document.createElement("span");
         thinkText.className = "thinking-text";
@@ -1822,6 +1874,7 @@
 
     function finishAssistant(tab, tabId, el, reply, vendor) {
       renderAssistantContent(el, reply, vendor);
+      renderMermaidDiagrams(el);
       el.appendChild(makeActions(reply));
       tab.history.push({ role: "assistant", content: reply });
       tab.chatLog.push({ role: "assistant", content: reply, images: [] });
@@ -1883,6 +1936,7 @@
             if (reply.trim()) {
               currentEl.style.display = "";
               renderAssistantContent(currentEl, reply, vendor);
+              renderMermaidDiagrams(currentEl);
               currentEl.appendChild(makeActions(reply));
               tab.chatLog.push({ role: "assistant", content: reply, images: [] });
               markUnsaved(tabId);
@@ -2072,6 +2126,53 @@
         });
         pre.appendChild(copyBtn);
       });
+    }
+
+    async function renderMermaidDiagrams(container) {
+      const diagrams = container.querySelectorAll(".mermaid[data-mermaid-id]");
+      for (const el of diagrams) {
+        const id = el.getAttribute("data-mermaid-id");
+        const source = el.textContent;
+        try {
+          const { svg } = await mermaid.render(id, source);
+          el.innerHTML = svg;
+          el.removeAttribute("data-mermaid-id");
+
+          // Add toolbar with copy and download buttons
+          const toolbar = document.createElement("div");
+          toolbar.className = "mermaid-toolbar";
+
+          const copyBtn = document.createElement("button");
+          copyBtn.title = "Copy Mermaid source";
+          copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+          copyBtn.addEventListener("click", async () => {
+            await ipcRenderer.invoke("copy-to-clipboard", source);
+            copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            setTimeout(() => {
+              copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+            }, 1500);
+          });
+
+          const dlBtn = document.createElement("button");
+          dlBtn.title = "Download SVG";
+          dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+          dlBtn.addEventListener("click", async () => {
+            const { filePath } = await ipcRenderer.invoke("save-mermaid-svg", svg);
+            if (filePath) {
+              dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+              setTimeout(() => {
+                dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+              }, 1500);
+            }
+          });
+
+          toolbar.append(copyBtn, dlBtn);
+          el.appendChild(toolbar);
+        } catch (e) {
+          el.innerHTML = `<pre class="mermaid-error">${e.message || "Mermaid rendering failed"}</pre>`;
+          el.removeAttribute("data-mermaid-id");
+        }
+      }
     }
 
     // ── Save helper ────────────────────────────────────────────────────────────

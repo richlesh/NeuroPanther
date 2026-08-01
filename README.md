@@ -1,6 +1,6 @@
-![app_icon_256](app_icon_256.png)
+![app_icon_256](resources/app_icon_256.png)
 
-# NeuroPanther Chat v1.7.0
+# NeuroPanther Chat v1.8.0
 
 A cross-platform desktop chat/agent application built with Electron that supports multiple AI vendors and models.
 
@@ -50,6 +50,12 @@ Connect to any of the following AI providers:
 - Render LaTeX math equations inline using `$...$` and in display blocks using `$$...$$`
 - Powered by KaTeX for fast, high-quality typesetting
 - Ideal for science, engineering, and academic discussions
+
+### Mermaid Diagrams
+- Render Mermaid diagrams inline when the AI responds with a ` ```mermaid ` code block
+- Supports flowcharts, sequence diagrams, class diagrams, state diagrams, Gantt charts, pie charts, and more
+- Diagrams are rendered as scalable SVG graphics directly in the chat
+- Powered by Mermaid.js with a dark theme to match the app UI
 
 ### Language Translation
 - Seamlessly translate AI responses into a selected language
@@ -206,6 +212,7 @@ Output files are placed in the `dist/` folder.
 - [marked](https://marked.js.org) — Markdown rendering
 - [KaTeX](https://katex.org) — LaTeX math rendering
 - [highlight.js](https://highlightjs.org) — Code syntax highlighting
+- [Mermaid](https://mermaid.js.org) — Diagram and chart rendering
 
 ---
 
