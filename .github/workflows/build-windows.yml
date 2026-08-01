@@ -61,10 +61,9 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Upload installer to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ github.ref_name }} --draft --title "v${{ github.ref_name }}" --generate-notes 2>$null
-          gh release upload ${{ github.ref_name }} `
-            (Get-ChildItem dist\*.exe | Select-Object -ExpandProperty FullName) --clobber
-        shell: powershell
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: NeuroPanther Chat ${{ github.ref_name }}
+          draft: true
+          files: dist/*.exe

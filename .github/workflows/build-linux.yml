@@ -40,9 +40,11 @@ jobs:
         run: ./node_modules/.bin/electron-builder --linux --${{ matrix.arch }} --publish never
 
       - name: Upload to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ github.ref_name }} --draft --title "v${{ github.ref_name }}" --generate-notes 2>/dev/null || true
-          gh release upload ${{ github.ref_name }} \
-            dist/*.deb dist/*.rpm --clobber
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: NeuroPanther Chat ${{ github.ref_name }}
+          draft: true
+          files: |
+            dist/*.deb
+            dist/*.rpm
