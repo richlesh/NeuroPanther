@@ -66,6 +66,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh release create ${{ github.event.inputs.tag }} --draft --title "${{ github.event.inputs.tag }}" --notes "" 2>$null
           gh release upload ${{ github.event.inputs.tag }} `
             (Get-ChildItem dist\*.exe | Select-Object -ExpandProperty FullName) --clobber
         shell: powershell
