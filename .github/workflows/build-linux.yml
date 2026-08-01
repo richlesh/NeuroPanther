@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - '*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release version tag (e.g. 1.8.0)"
+        required: true
 
 jobs:
   build-linux:
@@ -42,8 +47,8 @@ jobs:
       - name: Upload to release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
-          name: NeuroPanther Chat ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: NeuroPanther Chat ${{ inputs.tag || github.ref_name }}
           draft: true
           files: |
             dist/*.deb
