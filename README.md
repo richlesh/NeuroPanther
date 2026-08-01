@@ -37,6 +37,7 @@ Connect to any of the following AI providers:
 - Conversation history maintained across turns for context-aware responses
 - Submit with **Enter** key or the send button; **Shift+Enter** for new lines
 - Auto-growing text input
+- Copy and download buttons on code blocks, tables, math equations, and diagrams
 
 ### Agentic Capability
 - Agent Mode allows supported models to perform multi-step tasks autonomously
@@ -49,12 +50,14 @@ Connect to any of the following AI providers:
 ### Math Equations
 - Render LaTeX math equations inline using `$...$` and in display blocks using `$$...$$`
 - Powered by KaTeX for fast, high-quality typesetting
+- Copy and download buttons on display equations — copy LaTeX source or download as SVG
 - Ideal for science, engineering, and academic discussions
 
 ### Mermaid Diagrams
 - Render Mermaid diagrams inline when the AI responds with a ` ```mermaid ` code block
 - Supports flowcharts, sequence diagrams, class diagrams, state diagrams, Gantt charts, pie charts, and more
 - Diagrams are rendered as scalable SVG graphics directly in the chat
+- Copy and download buttons — copy Mermaid source or download as SVG (exported with light theme)
 - Powered by Mermaid.js with a dark theme to match the app UI
 
 ### Language Translation
@@ -75,7 +78,8 @@ Connect to any of the following AI providers:
 - Attach an image to any message using the attachment button
 - Image is displayed in the chat window before sending
 - The AI analyses the image along with your text prompt
-- Supported by OpenAI and Anthropic vendors
+- Image context is preserved in conversation history for follow-up questions
+- Supported by OpenAI, Anthropic, Google, and other vision-capable vendors
 
 ### Image Generation
 - Toggle **Generate Image** mode with the star button
@@ -131,6 +135,9 @@ Right-click any image in the chat to:
 
 ### Vendor Configuration
 Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code. Three generic vendor slots allow connecting to any OpenAI-compatible API.
+
+### System Prompt
+The base system prompt is loaded from `resources/system_prompt.md` at startup. Edit this file to customize the AI's default behavior, supported output formats, and instructions across all vendors. The system prompt is automatically combined with agent and translation instructions as needed.
 
 ---
 

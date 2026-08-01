@@ -237,6 +237,15 @@ function buildMenu() {
           { role: "front" },
         ] : []),
       ]
+    },
+    {
+      label: "Help",
+      submenu: [
+        {
+          label: "Online Help",
+          click: () => shell.openExternal("https://github.com/richlesh/NeuroPanther-Chat/blob/main/User_Manual.md")
+        }
+      ]
     }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -802,11 +811,23 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
           }
         } else {
           const role = m.role === "assistant" ? "assistant" : "user";
+          const content = [];
+          if (Array.isArray(m.content)) {
+            for (const part of m.content) {
+              if (part.type === "image") {
+                content.push({ image: { format: (part.mediaType || "image/png").split("/")[1] || "png", source: { bytes: Buffer.from(part.base64, "base64") } } });
+              } else {
+                content.push({ text: part.text || "" });
+              }
+            }
+          } else {
+            content.push({ text: m.content || "" });
+          }
           const last = amazonMessages[amazonMessages.length - 1];
           if (last && last.role === role) {
-            last.content.push({ text: m.content || "" });
+            last.content.push(...content);
           } else {
-            amazonMessages.push({ role, content: [{ text: m.content || "" }] });
+            amazonMessages.push({ role, content });
           }
         }
       }
@@ -856,7 +877,19 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
     } else if (vendor === "anthropic") {
       const client = new Anthropic({ apiKey });
       const sysMsg = messages.find(m => m.role === "system");
-      const userMsgs = messages.filter(m => m.role !== "system");
+      const userMsgs = messages.filter(m => m.role !== "system").map(m => {
+        if (Array.isArray(m.content)) {
+          // Convert image+text array to Anthropic format
+          const content = m.content.map(part => {
+            if (part.type === "image") {
+              return { type: "image", source: { type: "base64", media_type: part.mediaType, data: part.base64 } };
+            }
+            return { type: "text", text: part.text || "" };
+          });
+          return { role: m.role, content };
+        }
+        return m;
+      });
       const stream = await client.messages.stream({
         model, max_tokens: 128000,
         system: sysMsg?.content,
@@ -890,6 +923,14 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
         if (m.role === "system") { sysTxt = m.content || ""; continue; }
         if (m.role === "tool") {
           googleMessages.push({ role: "user", content: "Tool result for " + m.name + ": " + m.content });
+        } else if (Array.isArray(m.content)) {
+          const content = m.content.map(part => {
+            if (part.type === "image") {
+              return { type: "image_url", image_url: { url: `data:${part.mediaType};base64,${part.base64}` } };
+            }
+            return { type: "text", text: part.text || "" };
+          });
+          googleMessages.push({ role: m.role, content });
         } else {
           googleMessages.push({ ...m, content: m.content ?? "" });
         }
@@ -912,8 +953,21 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
       }
     } else {
       const client = new OpenAI({ apiKey, baseURL, defaultHeaders });
+      // Transform array content messages to OpenAI image_url format
+      const openaiMessages = messages.map(m => {
+        if (Array.isArray(m.content)) {
+          const content = m.content.map(part => {
+            if (part.type === "image") {
+              return { type: "image_url", image_url: { url: `data:${part.mediaType};base64,${part.base64}` } };
+            }
+            return { type: "text", text: part.text || "" };
+          });
+          return { role: m.role, content };
+        }
+        return m;
+      });
       const reasoningWithTools = tools && (vendor === "openai");
-      const stream = await client.chat.completions.create({ model, messages, stream: true, ...(tools ? { tools, tool_choice: "auto" } : {}), ...(reasoningWithTools ? { reasoning_effort: "none" } : {}) }, { signal: abortController.signal });
+      const stream = await client.chat.completions.create({ model, messages: openaiMessages, stream: true, ...(tools ? { tools, tool_choice: "auto" } : {}), ...(reasoningWithTools ? { reasoning_effort: "none" } : {}) }, { signal: abortController.signal });
       let fullText = "";
       const toolCallMap = {};
       for await (const chunk of stream) {
@@ -1113,7 +1167,7 @@ ipcMain.handle("chat-with-image", async (_event, { tempPath, mediaType, text, ve
 
   if (vendor === "anthropic") {
     const client = new Anthropic({ apiKey });
-    const res = await client.messages.create({
+    const stream = await client.messages.stream({
       model,
       max_tokens: 128000,
       messages: [{
@@ -1124,7 +1178,19 @@ ipcMain.handle("chat-with-image", async (_event, { tempPath, mediaType, text, ve
         ]
       }]
     });
-    return res.content[0].text;
+    let fullText = "";
+    for await (const chunk of stream) {
+      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+        fullText += chunk.delta.text;
+      }
+    }
+    return fullText;
+  }
+
+  // Vendors that don't support image/vision analysis
+  const noVisionVendors = new Set(["deepseek", "perplexity", "mistral", "cerebras"]);
+  if (noVisionVendors.has(vendor)) {
+    throw new Error(`${VENDORS[vendor]?.label || vendor} does not support image analysis. Try OpenAI, Anthropic, Google, or another vision-capable vendor.`);
   }
 
   const client = new OpenAI({ apiKey, baseURL: VENDORS[vendor]?.baseURL });
@@ -1429,6 +1495,30 @@ ipcMain.handle("save-mermaid-svg", async (_event, svgContent) => {
   });
   if (!filePath) return { filePath: null };
   fs.writeFileSync(filePath, svgContent, "utf-8");
+  return { filePath };
+});
+
+ipcMain.handle("save-code-block", async (_event, { code, lang }) => {
+  const extMap = {
+    javascript: "js", typescript: "ts", python: "py", ruby: "rb",
+    java: "java", c: "c", cpp: "cpp", csharp: "cs", go: "go",
+    rust: "rs", swift: "swift", kotlin: "kt", php: "php",
+    html: "html", css: "css", json: "json", yaml: "yml",
+    xml: "xml", sql: "sql", bash: "sh", shell: "sh",
+    markdown: "md", plaintext: "txt"
+  };
+  const ext = extMap[lang] || lang || "txt";
+  const win = BrowserWindow.getFocusedWindow() || mainWin;
+  const { filePath } = await dialog.showSaveDialog(win, {
+    title: "Save Code",
+    defaultPath: path.join(require("os").homedir(), "Downloads", `code.${ext}`),
+    filters: [
+      { name: `${lang || "Text"} file`, extensions: [ext] },
+      { name: "All Files", extensions: ["*"] }
+    ]
+  });
+  if (!filePath) return { filePath: null };
+  fs.writeFileSync(filePath, code, "utf-8");
   return { filePath };
 });
 

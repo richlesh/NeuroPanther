@@ -51,7 +51,7 @@
     @media print {
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { background: #fff; color: #000; font-family: -apple-system, sans-serif; height: auto !important; overflow: visible !important; }
-      #input-area, #attachment-preview-wrap, .msg-actions, .code-copy-btn { display: none !important; }
+      #input-area, #attachment-preview-wrap, .msg-actions, .code-toolbar, .mermaid-toolbar, .table-toolbar, .math-block-toolbar { display: none !important; }
       #chat { display: block; padding: 0; height: auto !important; overflow: visible !important; }
       .msg { max-width: 100%; border-radius: 0; margin-bottom: 12px; padding: 8px 12px; page-break-inside: avoid; }
       .msg.user { background: #e8f0fe; color: #000; text-align: right; }
@@ -141,10 +141,17 @@
     /* Hide any code action UI elements */
     code-action, code-action-button, [class*="code-action"] { display: none !important; }
     pre::part(code-action), code::part(code-action) { display: none !important; }
-    .code-copy-btn {
+    .code-toolbar {
       position: absolute;
       top: 6px;
       right: 6px;
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .msg.assistant pre:hover .code-toolbar { opacity: 1; }
+    .code-toolbar button {
       background: #444;
       border: none;
       color: #ccc;
@@ -152,22 +159,67 @@
       padding: 4px 6px;
       font-size: 11px;
       cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.15s;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .msg.assistant pre:hover .code-copy-btn { opacity: 1; }
-    .code-copy-btn:hover { background: #555; color: #fff; }
+    .code-toolbar button:hover { background: #555; color: #fff; }
     .msg.assistant blockquote { border-left: 3px solid #555; padding-left: 10px; color: #aaa; margin: 6px 0; }
     .msg.assistant table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 14px; }
     .msg.assistant th { background: #888; color: #fff; padding: 8px 12px; text-align: left; border: 1px solid #999; }
     .msg.assistant td { padding: 8px 12px; border: 1px solid #ccc; color: #000; }
     .msg.assistant tr:nth-child(odd) td { background: #f7f7f7; }
     .msg.assistant tr:nth-child(even) td { background: #fff; }
+    .table-wrap { position: relative; }
+    .table-toolbar {
+      position: absolute;
+      top: -2px;
+      right: 0;
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .table-wrap:hover .table-toolbar { opacity: 1; }
+    .table-toolbar button {
+      background: #444;
+      border: none;
+      color: #ccc;
+      border-radius: 5px;
+      padding: 4px 6px;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .table-toolbar button:hover { background: #555; color: #fff; }
     .msg.assistant a { color: var(--accent); }
     .msg.assistant .katex-display { overflow-x: auto; overflow-y: hidden; }
+    .math-block-wrap { position: relative; }
+    .math-block-toolbar {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .math-block-wrap:hover .math-block-toolbar { opacity: 1; }
+    .math-block-toolbar button {
+      background: #444;
+      border: none;
+      color: #ccc;
+      border-radius: 5px;
+      padding: 4px 6px;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .math-block-toolbar button:hover { background: #555; color: #fff; }
 
     .link-preview {
       position: fixed;
@@ -583,17 +635,18 @@
     #send-btn:disabled { background: #444; cursor: default; }
     #send-btn svg { pointer-events: none; }
 
-    .mermaid { position: relative; }
-    .mermaid svg { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+    .mermaid { position: relative; border-radius: 8px; overflow: visible; }
+    .mermaid svg { max-width: 100%; margin: 8px 0; }
     .mermaid-error { color: #ff6b6b; font-size: 12px; white-space: pre-wrap; }
     .mermaid-toolbar {
       position: absolute;
-      top: 8px;
+      top: 14px;
       right: 8px;
       display: flex;
       gap: 4px;
       opacity: 0;
       transition: opacity 0.15s;
+      z-index: 10;
     }
     .mermaid:hover .mermaid-toolbar { opacity: 1; }
     .mermaid-toolbar button {
@@ -602,10 +655,13 @@
       color: #ccc;
       border-radius: 5px;
       padding: 4px 6px;
+      font-size: 11px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 25px;
+      height: 21px;
     }
     .mermaid-toolbar button:hover { background: #555; color: #fff; }
   </style>
@@ -705,7 +761,8 @@
             if (match) return { type: "mathBlock", raw: match[0], text: match[1].trim() };
           },
           renderer(token) {
-            return katex.renderToString(token.text, { displayMode: true, throwOnError: false });
+            const rendered = katex.renderToString(token.text, { displayMode: true, throwOnError: false });
+            return `<div class="math-block-wrap" data-latex="${token.text.replace(/"/g, "&quot;")}">${rendered}</div>`;
           }
         },
         {
@@ -730,6 +787,24 @@
           }
           const language = hljs.getLanguage(lang) ? lang : "plaintext";
           return `<pre><code class="hljs language-${language}">${hljs.highlight(text, { language }).value}</code></pre>`;
+        };
+        r.table = ({ header, rows }) => {
+          let html = `<div class="table-wrap"><table><thead><tr>`;
+          for (const cell of header) {
+            const align = cell.align ? ` style="text-align:${cell.align}"` : "";
+            html += `<th${align}>${cell.text}</th>`;
+          }
+          html += `</tr></thead><tbody>`;
+          for (const row of rows) {
+            html += `<tr>`;
+            for (const cell of row) {
+              const align = cell.align ? ` style="text-align:${cell.align}"` : "";
+              html += `<td${align}>${cell.text}</td>`;
+            }
+            html += `</tr>`;
+          }
+          html += `</tbody></table></div>`;
+          return html;
         };
         return r;
       })()
@@ -1061,6 +1136,8 @@
           } else {
             div.innerHTML = marked.parse(msg.content || "");
             addCodeCopyButtons(div);
+            addTableToolbars(div);
+            addMathBlockToolbars(div);
             div.appendChild(makeActions(msg.content || ""));
           }
           container.appendChild(div);
@@ -1109,6 +1186,8 @@
           } else {
             div.innerHTML = marked.parse(msg.content || "");
             addCodeCopyButtons(div);
+            addTableToolbars(div);
+            addMathBlockToolbars(div);
             div.appendChild(makeActions(msg.content || ""));
           }
           tmp.appendChild(div);
@@ -1655,9 +1734,15 @@
             thinking.classList.remove("thinking-indicator");
             thinking.innerHTML = marked.parse(reply);
             addCodeCopyButtons(thinking);
+            addTableToolbars(thinking);
+            addMathBlockToolbars(thinking);
             renderMermaidDiagrams(thinking);
             thinking.appendChild(makeActions(reply));
-            tab.history.push({ role: "user", content: text || "What is in this image?" });
+            // Store image in history so follow-up messages include it
+            tab.history.push({ role: "user", content: [
+              { type: "image", mediaType: img.mediaType, base64: img.base64 },
+              { type: "text", text: text || "What is in this image?" }
+            ]});
             tab.history.push({ role: "assistant", content: reply });
             tab.chatLog.push({ role: "assistant", content: reply, images: [] });
           } else {
@@ -1666,8 +1751,8 @@
             tab.chatLog.push({ role: "user", content: userText, images: [] });
             if (tab.agentMode) {
               const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-              const langInstruction = tab.translateMode ? ` Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
-              const sysContent = `${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.${langInstruction}`;
+              const langInstruction = tab.translateMode ? `IMPORTANT: Always respond in ${tab.toLang}, regardless of the language the user writes in.\n\n` : "";
+              const sysContent = `${langInstruction}${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
               if (!tab.history.length || tab.history[0].role !== "system") {
                 tab.history.unshift({ role: "system", content: sysContent });
               } else {
@@ -1675,9 +1760,9 @@
               }
               await runAgentLoop(tab, tabId, vendor, model, thinking);
             } else {
-              if (baseSystemPrompt) {
-                const langInstruction = tab.translateMode ? ` Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
-                const sysContent = baseSystemPrompt + (langInstruction ? "\n\n" + langInstruction.trim() : "");
+              const langInstruction = tab.translateMode ? `IMPORTANT: Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
+              if (baseSystemPrompt || langInstruction) {
+                const sysContent = [langInstruction, baseSystemPrompt].filter(Boolean).join("\n\n");
                 if (!tab.history.length || tab.history[0].role !== "system") {
                   tab.history.unshift({ role: "system", content: sysContent });
                 } else {
@@ -1697,7 +1782,7 @@
       } else {
         addMessage("user", text, tabId);
         if (tab.translateMode) {
-          const sysContent = `${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}Always respond in ${tab.toLang}, regardless of the language the user writes in.`;
+          const sysContent = `IMPORTANT: Always respond in ${tab.toLang}, regardless of the language the user writes in.\n\n${baseSystemPrompt || ""}`.trim();
           if (!tab.history.length || tab.history[0].role !== "system") {
             tab.history.unshift({ role: "system", content: sysContent });
           } else {
@@ -1718,8 +1803,8 @@
         try {
         if (tab.agentMode) {
           const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-          const langInstruction = tab.translateMode ? ` Always respond in ${tab.toLang}, regardless of the language the user writes in.` : "";
-          const sysContent = `${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.${langInstruction}`;
+          const langInstruction = tab.translateMode ? `IMPORTANT: Always respond in ${tab.toLang}, regardless of the language the user writes in.\n\n` : "";
+          const sysContent = `${langInstruction}${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
           if (!tab.history.length || tab.history[0].role !== "system") {
             tab.history.unshift({ role: "system", content: sysContent });
           } else {
@@ -1870,6 +1955,8 @@
         el.innerHTML = marked.parse(text);
       }
       addCodeCopyButtons(el);
+      addTableToolbars(el);
+      addMathBlockToolbars(el);
     }
 
     function finishAssistant(tab, tabId, el, reply, vendor) {
@@ -2108,23 +2195,159 @@
 
     function addCodeCopyButtons(el) {
       el.querySelectorAll("pre").forEach(pre => {
-        // Skip if button already exists
-        if (pre.querySelector(".code-copy-btn")) return;
-        
+        // Skip if toolbar already exists
+        if (pre.querySelector(".code-toolbar")) return;
+
+        const toolbar = document.createElement("div");
+        toolbar.className = "code-toolbar";
+
+        const code = pre.querySelector("code");
+        const textContent = () => code ? code.innerText : pre.innerText;
+
+        // Detect language from class name
+        const langClass = code?.className?.match(/language-(\S+)/);
+        const lang = langClass ? langClass[1] : "";
+
         const copyBtn = document.createElement("button");
-        copyBtn.className = "code-copy-btn";
-        copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
         copyBtn.title = "Copy code";
+        copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
         copyBtn.addEventListener("click", async () => {
-          const code = pre.querySelector("code");
-          const textToCopy = code ? code.innerText : pre.innerText;
-          await ipcRenderer.invoke("copy-to-clipboard", textToCopy);
+          await ipcRenderer.invoke("copy-to-clipboard", textContent());
           copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
           setTimeout(() => {
             copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
           }, 1500);
         });
-        pre.appendChild(copyBtn);
+
+        const dlBtn = document.createElement("button");
+        dlBtn.title = "Download code";
+        dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+        dlBtn.addEventListener("click", async () => {
+          const { filePath } = await ipcRenderer.invoke("save-code-block", { code: textContent(), lang });
+          if (filePath) {
+            dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            setTimeout(() => {
+              dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+            }, 1500);
+          }
+        });
+
+        toolbar.append(copyBtn, dlBtn);
+        pre.appendChild(toolbar);
+      });
+    }
+
+    function addTableToolbars(el) {
+      el.querySelectorAll(".table-wrap").forEach(wrap => {
+        if (wrap.querySelector(".table-toolbar")) return;
+
+        const table = wrap.querySelector("table");
+        if (!table) return;
+
+        const toolbar = document.createElement("div");
+        toolbar.className = "table-toolbar";
+
+        // Convert table back to Markdown
+        function tableToMarkdown() {
+          const rows = table.querySelectorAll("tr");
+          if (!rows.length) return "";
+          const lines = [];
+          const headerCells = rows[0].querySelectorAll("th, td");
+          const headers = Array.from(headerCells).map(c => c.textContent.trim());
+          lines.push("| " + headers.join(" | ") + " |");
+          lines.push("| " + headers.map(() => "---").join(" | ") + " |");
+          for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].querySelectorAll("td, th");
+            const vals = Array.from(cells).map(c => c.textContent.trim());
+            lines.push("| " + vals.join(" | ") + " |");
+          }
+          return lines.join("\n");
+        }
+
+        const copyBtn = document.createElement("button");
+        copyBtn.title = "Copy table as Markdown";
+        copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        copyBtn.addEventListener("click", async () => {
+          await ipcRenderer.invoke("copy-to-clipboard", tableToMarkdown());
+          copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+          setTimeout(() => {
+            copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+          }, 1500);
+        });
+
+        const dlBtn = document.createElement("button");
+        dlBtn.title = "Download table as CSV";
+        dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+        dlBtn.addEventListener("click", async () => {
+          const rows = table.querySelectorAll("tr");
+          const csvLines = [];
+          for (const row of rows) {
+            const cells = row.querySelectorAll("th, td");
+            const values = Array.from(cells).map(c => {
+              const val = c.textContent.trim();
+              return val.includes(",") || val.includes('"') || val.includes("\n") ? '"' + val.replace(/"/g, '""') + '"' : val;
+            });
+            csvLines.push(values.join(","));
+          }
+          const { filePath } = await ipcRenderer.invoke("save-code-block", { code: csvLines.join("\n"), lang: "csv" });
+          if (filePath) {
+            dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            setTimeout(() => {
+              dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+            }, 1500);
+          }
+        });
+
+        toolbar.append(copyBtn, dlBtn);
+        wrap.appendChild(toolbar);
+      });
+    }
+
+    function addMathBlockToolbars(el) {
+      el.querySelectorAll(".math-block-wrap").forEach(wrap => {
+        if (wrap.querySelector(".math-block-toolbar")) return;
+
+        const latex = wrap.getAttribute("data-latex") || "";
+        const toolbar = document.createElement("div");
+        toolbar.className = "math-block-toolbar";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.title = "Copy LaTeX source";
+        copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        copyBtn.addEventListener("click", async () => {
+          await ipcRenderer.invoke("copy-to-clipboard", latex);
+          copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+          setTimeout(() => {
+            copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+          }, 1500);
+        });
+
+        const dlBtn = document.createElement("button");
+        dlBtn.title = "Download SVG";
+        dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+        dlBtn.addEventListener("click", async () => {
+          // Render as MathML wrapped in SVG foreignObject — MathML renders natively in browsers
+          const mathml = katex.renderToString(latex, { displayMode: true, throwOnError: false, output: "mathml" });
+          const width = wrap.querySelector(".katex-display")?.scrollWidth || 400;
+          const height = wrap.querySelector(".katex-display")?.scrollHeight || 60;
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  <foreignObject width="100%" height="100%">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:20px;display:flex;align-items:center;justify-content:center;height:100%">
+      ${mathml}
+    </div>
+  </foreignObject>
+</svg>`;
+          const { filePath } = await ipcRenderer.invoke("save-mermaid-svg", svg);
+          if (filePath) {
+            dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            setTimeout(() => {
+              dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+            }, 1500);
+          }
+        });
+
+        toolbar.append(copyBtn, dlBtn);
+        wrap.appendChild(toolbar);
       });
     }
 
@@ -2157,7 +2380,17 @@
           dlBtn.title = "Download SVG";
           dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
           dlBtn.addEventListener("click", async () => {
-            const { filePath } = await ipcRenderer.invoke("save-mermaid-svg", svg);
+            // Re-render with light theme for export
+            const lightId = "mermaid-light-" + Math.random().toString(36).slice(2, 10);
+            mermaid.initialize({ startOnLoad: false, theme: "default", suppressErrorRendering: true });
+            let lightSvg;
+            try {
+              const result = await mermaid.render(lightId, source);
+              lightSvg = result.svg;
+            } finally {
+              mermaid.initialize({ startOnLoad: false, theme: "dark", suppressErrorRendering: true });
+            }
+            const { filePath } = await ipcRenderer.invoke("save-mermaid-svg", lightSvg);
             if (filePath) {
               dlBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
               setTimeout(() => {
