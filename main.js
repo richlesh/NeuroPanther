@@ -879,13 +879,16 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
       const sysMsg = messages.find(m => m.role === "system");
       const userMsgs = messages.filter(m => m.role !== "system").map(m => {
         if (Array.isArray(m.content)) {
-          // Convert image+text array to Anthropic format
+          // Convert image+text array to Anthropic format, pass through native blocks
           const content = m.content.map(part => {
             if (part.type === "image") {
               return { type: "image", source: { type: "base64", media_type: part.mediaType, data: part.base64 } };
             }
-            return { type: "text", text: part.text || "" };
-          });
+            if (part.type === "tool_use" || part.type === "tool_result") {
+              return part;
+            }
+            return { type: "text", text: part.text || part.content || "" };
+          }).filter(part => !(part.type === "text" && !part.text));
           return { role: m.role, content };
         }
         return m;

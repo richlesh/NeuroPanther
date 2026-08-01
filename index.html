@@ -1752,7 +1752,8 @@
             if (tab.agentMode) {
               const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
               const langInstruction = tab.translateMode ? `IMPORTANT: Always respond in ${tab.toLang}, regardless of the language the user writes in.\n\n` : "";
-              const sysContent = `${langInstruction}${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
+              const agentInstruction = `You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
+              const sysContent = `${langInstruction}${agentInstruction}${baseSystemPrompt ? "\n\n" + baseSystemPrompt : ""}`;
               if (!tab.history.length || tab.history[0].role !== "system") {
                 tab.history.unshift({ role: "system", content: sysContent });
               } else {
@@ -1804,7 +1805,8 @@
         if (tab.agentMode) {
           const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
           const langInstruction = tab.translateMode ? `IMPORTANT: Always respond in ${tab.toLang}, regardless of the language the user writes in.\n\n` : "";
-          const sysContent = `${langInstruction}${baseSystemPrompt ? baseSystemPrompt + "\n\n" : ""}You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
+          const agentInstruction = `You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
+          const sysContent = `${langInstruction}${agentInstruction}${baseSystemPrompt ? "\n\n" + baseSystemPrompt : ""}`;
           if (!tab.history.length || tab.history[0].role !== "system") {
             tab.history.unshift({ role: "system", content: sysContent });
           } else {
@@ -2002,8 +2004,9 @@
       try {
       while (turns++ < MAX_TURNS) {
         addAgentActivity(tabId, `Agent turn ${turns}`, "Waiting for model response…");
+        let reply = "";
         const toolCalls = await new Promise((resolve, reject) => {
-          let reply = "";
+          reply = "";
           const sid = "s" + Date.now() + Math.random();
           activeStreams[tabId] = sid;
 
@@ -2050,7 +2053,10 @@
 
         // push assistant tool-call message to history
         if (vendor === "anthropic") {
-          tab.history.push({ role: "assistant", content: toolCalls.map(tc => ({ type: "tool_use", id: tc.id, name: tc.name, input: tc.args })) });
+          const assistantContent = [];
+          if (reply.trim()) assistantContent.push({ type: "text", text: reply });
+          assistantContent.push(...toolCalls.map(tc => ({ type: "tool_use", id: tc.id, name: tc.name, input: tc.args })));
+          tab.history.push({ role: "assistant", content: assistantContent });
         } else {
           tab.history.push({ role: "assistant", content: null, tool_calls: toolCalls.map(tc => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
         }
