@@ -788,18 +788,18 @@
           const language = hljs.getLanguage(lang) ? lang : "plaintext";
           return `<pre><code class="hljs language-${language}">${hljs.highlight(text, { language }).value}</code></pre>`;
         };
-        r.table = ({ header, rows }) => {
+        r.table = function({ header, rows }) {
           let html = `<div class="table-wrap"><table><thead><tr>`;
           for (const cell of header) {
             const align = cell.align ? ` style="text-align:${cell.align}"` : "";
-            html += `<th${align}>${cell.text}</th>`;
+            html += `<th${align}>${this.parser.parseInline(cell.tokens)}</th>`;
           }
           html += `</tr></thead><tbody>`;
           for (const row of rows) {
             html += `<tr>`;
             for (const cell of row) {
               const align = cell.align ? ` style="text-align:${cell.align}"` : "";
-              html += `<td${align}>${cell.text}</td>`;
+              html += `<td${align}>${this.parser.parseInline(cell.tokens)}</td>`;
             }
             html += `</tr>`;
           }
