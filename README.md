@@ -20,10 +20,10 @@ Connect to any of the following AI providers:
 - **IBM** — Granite, Llama, and other models via watsonx.ai Model Gateway
 - **DeepSeek** — DeepSeek Chat, DeepSeek Reasoner
 - **Alibaba** — Qwen Max, Qwen Plus, Qwen Turbo
-- **Meta** — Llama 3.3 70B, Llama 3.1 8B
+- **Meta** — Muse Spark 1.1
 - **xAI** — Grok 3, Grok 3 Mini, Grok 2
 - **Groq** — Llama 3.3 70B, Llama 3.1 8B, Gemma2 9B, Qwen QWQ 32B
-- **Perplexity** — Sonar Pro, Sonar, Sonar Deep Research
+- **Perplexity** — Sonar Pro, Sonar Reasoning Pro
 - **Mistral** — Mistral Large, Medium, Small, Open Mistral Nemo
 - **Cerebras** — Llama 4 Scout, Llama 3.3 70B, Qwen 3 32B
 - **Moonshot AI** — Kimi K2, Moonshot v1 (128k, 32k, 8k context)
@@ -83,7 +83,7 @@ Connect to any of the following AI providers:
 
 ### Image Generation
 - Toggle **Generate Image** mode with the star button
-- Supported vendors: **OpenAI** (gpt-image-1), **Google** (Imagen 4.0), **Stability AI**, **Leonardo**, **Ideogram**
+- Supported vendors: **OpenAI** (gpt-image-1), **Google** (Imagen 4.0, Imagen 4.0 Ultra), **Alibaba** (Qwen Image), **xAI** (Grok Imagine), **Stability AI**, **Leonardo**, **Ideogram**, **Recraft**, **Flux (BFL)**, **fal.ai**
 - Generated images are displayed inline in the chat
 - Download generated images via the download button or right-click menu
 - Follow-up image refinement supported for select providers
@@ -194,7 +194,7 @@ Output files are placed in the `dist/` folder.
 | IBM | https://cloud.ibm.com/iam/apikeys |
 | DeepSeek | https://platform.deepseek.com/api_keys |
 | Alibaba | https://www.alibabacloud.com/help/en/model-studio/get-api-key |
-| Meta | https://llama.developer.meta.com/docs/api-keys |
+| Meta | https://developer.meta.com/ai/ |
 | xAI | https://console.x.ai/team/default/api-keys |
 | Groq | https://console.groq.com/keys |
 | Perplexity | https://www.perplexity.ai/settings/api |
@@ -204,6 +204,9 @@ Output files are placed in the `dist/` folder.
 | Stability AI | https://platform.stability.ai/account/keys |
 | Leonardo | https://app.leonardo.ai/api-access |
 | Ideogram | https://ideogram.ai/manage-api |
+| Recraft | https://app.recraft.ai/profile/api |
+| Flux (BFL) | https://dashboard.bfl.ai/ |
+| fal.ai | https://fal.ai/dashboard/keys |
 | Brave Search | https://api.search.brave.com |
 | Ollama | Local — no API key required |
 
