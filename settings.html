@@ -8,13 +8,15 @@
 
     body {
       font-family: -apple-system, sans-serif;
-      background: #1e1e1e;
-      color: #e0e0e0;
+      background: #f5f5f5;
+      color: #1e1e1e;
       padding: 24px;
       column-count: 2;
       column-gap: 24px;
     }
-    
+
+    body.dark { background: #1e1e1e; color: #e0e0e0; }
+
     body > div {
       break-inside: avoid;
       margin-bottom: 8px;
@@ -27,18 +29,20 @@
       margin-top: 8px;
     }
 
-    label { display: block; font-size: 14px; color: #aaa; margin-bottom: 4px; }
+    label { display: block; font-size: 14px; color: #666; margin-bottom: 4px; }
+    body.dark label { color: #aaa; }
 
     select, input {
       width: 100%;
-      background: #3a3a3c;
-      color: #e0e0e0;
-      border: 1px solid #555;
+      background: #fff;
+      color: #1e1e1e;
+      border: 1px solid #ccc;
       border-radius: 8px;
       padding: 8px 10px;
       font-size: 14px;
       outline: none;
     }
+    body.dark select, body.dark input { background: #3a3a3c; color: #e0e0e0; border-color: #555; }
     select:focus, input:focus { border-color: #0a84ff; }
 
     .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
@@ -50,15 +54,20 @@
       font-size: 14px;
       cursor: pointer;
     }
-    #cancel-btn { background: #3a3a3c; color: #e0e0e0; }
+    #cancel-btn { background: #ddd; color: #1e1e1e; }
+    body.dark #cancel-btn { background: #3a3a3c; color: #e0e0e0; }
     #save-btn   { background: #0a84ff; color: #fff; }
-    #api-key-link { font-size: 14px; color: #4da3ff; text-decoration: none; margin-top: 4px; display: inline-block; }
+    #api-key-link { font-size: 14px; color: #0a84ff; text-decoration: none; margin-top: 4px; display: inline-block; }
+    body.dark #api-key-link { color: #4da3ff; }
     #api-key-link:hover { text-decoration: underline; }
-    .section-title { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; padding-top: 12px; padding-bottom: 12px; }
+    .section-title { font-size: 14px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; padding-top: 12px; padding-bottom: 12px; }
+    body.dark .section-title { color: #666; }
     .dir-row { display: flex; gap: 8px; align-items: center; }
     .dir-row input { flex: 1; }
-    .dir-btn { padding: 8px 12px; border-radius: 8px; border: none; background: #3a3a3c; color: #e0e0e0; cursor: pointer; font-size: 14px; white-space: nowrap; flex-shrink: 0; }
-    .dir-btn:hover { background: #4a4a4e; }
+    .dir-btn { padding: 8px 12px; border-radius: 8px; border: none; background: #ddd; color: #1e1e1e; cursor: pointer; font-size: 14px; white-space: nowrap; flex-shrink: 0; }
+    .dir-btn:hover { background: #ccc; }
+    body.dark .dir-btn { background: #3a3a3c; color: #e0e0e0; }
+    body.dark .dir-btn:hover { background: #4a4a4e; }
     #api-key-section[style*="display: none"] { display: none !important; position: absolute; }
   </style>
 </head>
@@ -141,9 +150,16 @@
 
   <!-- Display Settings -->
   <h1>Display Settings</h1>
-  <div style="display:flex;align-items:center;gap:8px;">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <input type="checkbox" id="display-model-activity" style="width:auto;margin:0;">
     <label for="display-model-activity" style="margin:0;cursor:pointer;">Display Model Activity</label>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <label for="theme-select" style="margin:0;font-size:14px;color:#aaa;">Theme</label>
+      <select id="theme-select" style="width:auto;min-width:80px;">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
   </div>
 
   <!-- Font Settings -->
@@ -215,6 +231,9 @@
     ipcRenderer.invoke("settings-get-data").then(async ({ settings, VENDORS }) => {
       vendors = VENDORS;
       current = settings;
+
+      if ((current.theme || "light") === "dark") document.body.classList.add("dark");
+
       if (!current.defaultModels) current.defaultModels = {};
 
       for (const [key, v] of Object.entries(vendors).sort((a, b) => a[1].label.localeCompare(b[1].label))) {
@@ -255,6 +274,8 @@
       toSel.value = current.defaultToLang || "English";
 
       document.getElementById("display-model-activity").checked = current.displayModelActivity !== false;
+
+      document.getElementById("theme-select").value = current.theme || "light";
 
       // Populate font selectors
       const textFontSel = document.getElementById("text-font");
@@ -547,6 +568,7 @@
         workingDir: document.getElementById("working-dir").value,
         defaultToLang:    document.getElementById("default-to-lang").value,
         displayModelActivity: document.getElementById("display-model-activity").checked,
+        theme:            document.getElementById("theme-select").value,
         ttsVoice:         document.getElementById("tts-voice").value,
         textFont:         document.getElementById("text-font").value,
         textFontSize:     document.getElementById("text-font-size").value,

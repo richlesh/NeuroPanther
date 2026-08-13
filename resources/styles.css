@@ -1,0 +1,113 @@
+/* NeuroPanther Chat — Light Theme */
+
+body {
+  background: #f5f5f5;
+  color: #1e1e1e;
+}
+
+/* Tab bar */
+#tab-bar {
+  background: #e8e8e8;
+  border-bottom-color: #ccc;
+}
+.tab {
+  background: #ddd;
+  border-right-color: #ccc;
+  color: #555;
+}
+.tab:hover { background: #d0d0d0; color: #333; }
+.tab.active { background: #f5f5f5; color: #1e1e1e; }
+.tab-title-input { background: #fff; color: #1e1e1e; border-color: #0a84ff; }
+.tab-close { color: #999; }
+.tab-close:hover { color: #ff453a; }
+#new-tab-btn { color: #999; }
+#new-tab-btn:hover { color: #333; background: #d0d0d0; }
+
+/* Messages */
+.msg.error { background: #fde8e8; color: #c53030; }
+.msg.info { color: #666; }
+
+/* Assistant message content */
+.msg.assistant code { background: #e8e8e8; color: #1e1e1e; }
+.msg.assistant pre { background: #e8e8e8; }
+.msg.assistant pre code { color: #1e1e1e; }
+.msg.assistant blockquote { border-left-color: #ccc; color: #666; }
+.msg.assistant th { background: #ddd; color: #1e1e1e; border-color: #bbb; }
+.msg.assistant td { border-color: #ccc; color: #1e1e1e; }
+.msg.assistant tr:nth-child(odd) td { background: #f0f0f0; }
+.msg.assistant tr:nth-child(even) td { background: #fff; }
+
+/* Message actions */
+.msg-actions { border-top-color: #ddd; }
+.msg-actions button { color: #888; }
+.msg-actions button:hover { color: #333; background: #e0e0e0; }
+
+/* Toolbars */
+.code-toolbar button { background: #ccc; color: #555; }
+.code-toolbar button:hover { background: #bbb; color: #1e1e1e; }
+.table-toolbar button { background: #ccc; color: #555; }
+.table-toolbar button:hover { background: #bbb; color: #1e1e1e; }
+.math-block-toolbar button { background: #ccc; color: #555; }
+.math-block-toolbar button:hover { background: #bbb; color: #1e1e1e; }
+.mermaid-toolbar button { background: #ccc; color: #555; }
+.mermaid-toolbar button:hover { background: #bbb; color: #1e1e1e; }
+
+/* Link preview */
+.link-preview { background: #fff; border-color: #ccc; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.link-preview-loading { color: #666; }
+
+/* Image modal */
+#img-modal { background: rgba(0,0,0,0.6); }
+#img-modal img { box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
+
+/* Input area */
+#input-area { border-top-color: #ccc; background: #e8e8e8; }
+#prompt { background: #fff; color: #1e1e1e; }
+.icon-btn { background: #ddd; color: #555; }
+.icon-btn:hover { background: #ccc; color: #1e1e1e; }
+#send-btn:disabled { background: #bbb; }
+#vendor-select, #model-select, #image-model-select { background: #fff; color: #1e1e1e; }
+
+/* Attachment preview */
+#attachment-preview-wrap { background: #e8e8e8; border-top-color: #ccc; }
+.attach-badge { background: #ddd; color: #333; }
+.attach-badge-remove { color: #999; }
+.attach-badge-remove:hover { color: #ff453a; }
+
+/* Translate & agent rows */
+#translate-row { background: #e8e8e8; border-top-color: #ccc; }
+#translate-row label { color: #666; }
+#translate-row select { background: #fff; color: #1e1e1e; }
+#agent-row { background: #e8e8e8; border-top-color: #ccc; color: #666; }
+#agent-row button { background: #ddd; color: #555; }
+#agent-row button:hover { background: #ccc; color: #1e1e1e; }
+
+/* Tool cards */
+.tool-card { background: #e8f5e9; border-color: #a5d6a7; }
+.tool-card.denied { background: #fde8e8; border-color: #f5a5a5; }
+.tool-card.executed { background: #e3f2fd; border-color: #90caf9; }
+.tool-card-header { color: #2e7d32; }
+.tool-card.denied .tool-card-header { color: #c53030; }
+.tool-card.executed .tool-card-header { color: #1565c0; }
+.tool-card-args { color: #555; background: #f5f5f5; }
+.tool-card-result { color: #333; background: #f5f5f5; }
+.tool-allow-btn { background: #c8e6c9; color: #2e7d32; }
+.tool-allow-btn:hover { background: #a5d6a7; }
+.tool-deny-btn { background: #ffcdd2; color: #c53030; }
+.tool-deny-btn:hover { background: #ef9a9a; }
+
+/* Agent activity */
+.agent-activity { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; }
+.agent-activity.error { background: #fde8e8; border-color: #f5a5a5; color: #c53030; }
+.agent-activity-detail { color: #555; background: #f5f5f5; }
+
+/* Thinking blocks */
+.think-block { border-color: #ccc; background: #eee; }
+.think-block-title { background: #ddd; color: #555; }
+.think-block-body { color: #444; }
+.thinking-text { color: #666; }
+.thinking-cancel { color: #e74c3c; }
+.thinking-cancel:hover { background: rgba(231, 76, 60, 0.1); }
+
+/* Mermaid */
+.mermaid-error { color: #c53030; }
