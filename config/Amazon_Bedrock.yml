@@ -1,0 +1,47 @@
+# Amazon Bedrock Configuration (OpenAI-compatible bedrock-mantle endpoint)
+#
+# AUTHENTICATION:
+# This requires an Amazon Bedrock API key (NOT a regular AWS access key).
+# Generate one at: https://console.aws.amazon.com/bedrock/ → API keys
+# Choose "Generate short-term API keys" (expires with your console session, max 12 hours)
+# or create a long-term key via the AWS CLI/API.
+#
+# Set the API Key field in Settings to your Bedrock API key.
+#
+# REGION:
+# Replace "us-east-1" below with your preferred AWS region if different.
+#
+# MODELS:
+# Model IDs use the format: us.anthropic.claude-sonnet-4-6, amazon.nova-pro-v1:0, etc.
+# The Models endpoint below will list all available models for your account.
+#
+Prompt:
+  URI: https://bedrock-mantle.us-east-1.api.aws/v1/chat/completions
+  Method: POST
+  Headers:
+    Content-Type: application/json
+    Authorization: "Bearer ${AUTH_TOKEN}"
+  ConversationMode: multi-turn
+  Body: |
+    {
+      "model": "${MODEL}",
+      "messages": ${MESSAGES},
+      "temperature": 0,
+      "stream": false
+    }
+  Response:
+    ContentPath: "choices[0].message.content"
+
+Models:
+  URI: https://bedrock-mantle.us-east-1.api.aws/v1/models
+  Method: GET
+  Headers:
+    Authorization: "Bearer ${AUTH_TOKEN}"
+  Response:
+    ListPath: "data"
+    IdField: "id"
+    DescriptionField: "id"
+
+Embedding:
+  URI: https://bedrock-mantle.us-east-1.api.aws/v1/embeddings
+  Model: amazon.titan-embed-text-v2:0
