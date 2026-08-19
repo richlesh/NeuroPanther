@@ -902,13 +902,15 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
           toolSpec: { name: t.function.name, description: t.function.description, inputSchema: { json: t.function.parameters } }
         }))
       } : undefined;
+      // Only enable thinking for Claude models that support it (Sonnet 3.7+, Opus 4+)
+      const supportsBedrockThinking = /anthropic\.claude-(sonnet|opus)/i.test(model);
       const command = new ConverseStreamCommand({
         modelId: model,
         messages: amazonMessages,
         ...(systemPrompt ? { system: [{ text: systemPrompt.content }] } : {}),
         ...(amazonToolConfig ? { toolConfig: amazonToolConfig } : {}),
         inferenceConfig: { maxTokens: 4096 },
-        additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 4096 } }
+        ...(supportsBedrockThinking ? { additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 4096 } } } : {})
       });
       const response = await client.send(command, { abortSignal: abortController.signal });
       let fullText = "";
