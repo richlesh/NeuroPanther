@@ -225,6 +225,7 @@
     }
 
     .msg img { max-width: 100%; border-radius: 10px; display: block; margin-top: 6px; cursor: zoom-in; }
+    .msg img.emoji { display: inline-block; height: 1.2em; width: 1.2em; vertical-align: -0.2em; margin: 0 0.05em; border-radius: 0; cursor: default; }
 
     #img-modal {
       display: none;
@@ -1057,7 +1058,7 @@
             div.appendChild(img);
             div.appendChild(makeImageDownloadAction(msg.images[0], "image"));
           } else {
-            div.innerHTML = marked.parse(msg.content || "");
+            div.innerHTML = replaceEmoji(marked.parse(msg.content || ""));
             addCodeCopyButtons(div);
             addTableToolbars(div);
             addMathBlockToolbars(div);
@@ -1107,7 +1108,7 @@
             div.appendChild(img);
             div.appendChild(makeImageDownloadAction(msg.images[0], "image"));
           } else {
-            div.innerHTML = marked.parse(msg.content || "");
+            div.innerHTML = replaceEmoji(marked.parse(msg.content || ""));
             addCodeCopyButtons(div);
             addTableToolbars(div);
             addMathBlockToolbars(div);
@@ -1439,6 +1440,7 @@
         return;
       }
       if (e.target.tagName !== "IMG") return;
+      if (e.target.classList.contains("emoji")) return;
       e.preventDefault();
       ipcRenderer.invoke("image-context-menu", e.target.src);
     });
@@ -1457,6 +1459,7 @@
     const imgModalImg = document.getElementById("img-modal-img");
     chatEl.addEventListener("click", e => {
       if (e.target.tagName !== "IMG") return;
+      if (e.target.classList.contains("emoji")) return;
       imgModalImg.src = e.target.src;
       imgModal.classList.add("visible");
     });
@@ -1658,7 +1661,7 @@
             const tempPath = await ipcRenderer.invoke("save-temp-image", { base64: img.base64, mediaType: img.mediaType });
             const reply = await ipcRenderer.invoke("chat-with-image", { tempPath, mediaType: img.mediaType, text: text || "What is in this image?", vendor, model });
             thinking.classList.remove("thinking-indicator");
-            thinking.innerHTML = marked.parse(reply);
+            thinking.innerHTML = replaceEmoji(marked.parse(reply));
             addCodeCopyButtons(thinking);
             addTableToolbars(thinking);
             addMathBlockToolbars(thinking);
@@ -1837,6 +1840,110 @@
       });
     }
 
+    // ── Twemoji: replace non-BMP emoji with SVG images (fallback) ──────────────
+    const TWEMOJI_BASE = "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/";
+
+    /**
+     * Detect whether the system can render color emoji natively.
+     * Draws a known emoji to a canvas and checks for color pixels.
+     * Returns true if color emoji font is available (macOS, Windows, Linux with Noto Color Emoji).
+     */
+    const hasColorEmoji = (() => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 20;
+        canvas.height = 20;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#000";
+        ctx.textBaseline = "top";
+        ctx.font = "16px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+        ctx.fillText("\uD83D\uDE00", 0, 0); // 😀
+        const data = ctx.getImageData(0, 0, 20, 20).data;
+        // Check for any pixel with color (not purely grayscale/transparent)
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] > 0) { // non-transparent pixel
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            // Color emoji will have varied RGB values; monochrome will be uniform
+            if (r !== g || g !== b) return true;
+          }
+        }
+        return false;
+      } catch {
+        return true; // Assume color emoji available if detection fails
+      }
+    })();
+
+    /**
+     * Replaces non-BMP Unicode characters (emoji) in an HTML string with inline
+     * <img> tags referencing Twemoji SVG images from a CDN.
+     * Only performs replacement if the system lacks a color emoji font.
+     * Handles surrogate pairs, ZWJ sequences, variation selectors, skin tone
+     * modifiers, and flag (regional indicator) sequences.
+     */
+    function replaceEmoji(html) {
+      if (!html || hasColorEmoji) return html;
+      let result = "";
+      let i = 0;
+      while (i < html.length) {
+        const c = html.charCodeAt(i);
+
+        // Check for high surrogate (start of a supplementary character)
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < html.length) {
+          const lo = html.charCodeAt(i + 1);
+          if (lo >= 0xDC00 && lo <= 0xDFFF) {
+            // Collect the full emoji sequence
+            const codePoints = [];
+            let cp = ((c - 0xD800) << 10) + (lo - 0xDC00) + 0x10000;
+            codePoints.push(cp);
+            i += 2;
+
+            // Continue collecting joined characters
+            while (i < html.length) {
+              let nextCp = -1;
+              let advance = 0;
+              const nc = html.charCodeAt(i);
+
+              if (nc >= 0xD800 && nc <= 0xDBFF && i + 1 < html.length) {
+                const nlo = html.charCodeAt(i + 1);
+                if (nlo >= 0xDC00 && nlo <= 0xDFFF) {
+                  nextCp = ((nc - 0xD800) << 10) + (nlo - 0xDC00) + 0x10000;
+                  advance = 2;
+                }
+              } else if (nc === 0x200D || nc === 0xFE0F || nc === 0xFE0E || nc === 0x20E3) {
+                nextCp = nc;
+                advance = 1;
+              }
+
+              if (nextCp === -1) break;
+
+              // Is this a valid continuation?
+              if (nextCp === 0x200D || nextCp === 0xFE0F || nextCp === 0xFE0E
+                  || (nextCp >= 0x1F3FB && nextCp <= 0x1F3FF)   // skin tones
+                  || (nextCp >= 0xE0020 && nextCp <= 0xE007F)   // tag characters
+                  || (nextCp >= 0x1F1E6 && nextCp <= 0x1F1FF)   // regional indicators
+                  || codePoints[codePoints.length - 1] === 0x200D // after ZWJ, allow next emoji
+                  || (nextCp >= 0x1F1E6 && nextCp <= 0x1F1FF)) { // flag pairs
+                codePoints.push(nextCp);
+                i += advance;
+              } else {
+                break;
+              }
+            }
+
+            // Build filename from code points (hex, joined by -)
+            const filename = codePoints.map(p => p.toString(16)).join("-");
+            const alt = String.fromCodePoint(...codePoints);
+            const fallback = filename.replace(/-fe0f/g, "");
+            result += `<img src="${TWEMOJI_BASE}${filename}.svg" alt="${alt.replace(/"/g, "&quot;")}" class="emoji" draggable="false" onerror="this.onerror=null;this.src='${TWEMOJI_BASE}${fallback}.svg';">`;
+            continue;
+          }
+        }
+        result += html.charAt(i);
+        i++;
+      }
+      return result;
+    }
+
     function renderAssistantContent(el, reply, vendor) {
       el.classList.remove("thinking-indicator");
       el.innerHTML = "";
@@ -1851,7 +1958,7 @@
             const contentText = text.slice(pos);
             if (contentText || !el.children.length) {
               const content = document.createElement("div");
-              content.innerHTML = marked.parse(contentText || text);
+              content.innerHTML = replaceEmoji(marked.parse(contentText || text));
               el.appendChild(content);
             }
             break;
@@ -1859,7 +1966,7 @@
           const before = text.slice(pos, start);
           if (before) {
             const content = document.createElement("div");
-            content.innerHTML = marked.parse(before);
+            content.innerHTML = replaceEmoji(marked.parse(before));
             el.appendChild(content);
           }
           const bodyStart = start + "<think>".length;
@@ -1873,14 +1980,14 @@
           title.textContent = isOpen ? "Model thinking…" : "Model thinking";
           const body = document.createElement("div");
           body.className = "think-block-body";
-          body.innerHTML = marked.parse(thinkText.trim() || "…");
+          body.innerHTML = replaceEmoji(marked.parse(thinkText.trim() || "…"));
           think.append(title, body);
           el.appendChild(think);
           if (isOpen) break;
           pos = end + "</think>".length;
         }
       } else {
-        el.innerHTML = marked.parse(text);
+        el.innerHTML = replaceEmoji(marked.parse(text));
       }
       addCodeCopyButtons(el);
       addTableToolbars(el);
