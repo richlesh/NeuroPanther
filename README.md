@@ -1,6 +1,6 @@
 ![app_icon_256](resources/app_icon_256.png)
 
-# NeuroPanther Chat v1.8.0
+# NeuroPanther Chat v1.9.0
 
 A cross-platform desktop chat/agent application built with Electron that supports multiple AI vendors and models.
 
@@ -28,6 +28,7 @@ Connect to any of the following AI providers:
 - **Cerebras** — Llama 4 Scout, Llama 3.3 70B, Qwen 3 32B
 - **Moonshot AI** — Kimi K2, Moonshot v1 (128k, 32k, 8k context)
 - **Generic 1/2/3** — Connect to any OpenAI-compatible API with custom endpoint and key
+- **Generic (YAML)** — Connect to any LLM API with fully customizable YAML-driven HTTP request/response configuration
 - **Ollama** — Local models (requires Ollama installed and running)
 
 ### Chat
@@ -134,7 +135,7 @@ Right-click any image in the chat to:
 - Settings are saved to `~/.neuropanther-chat-settings.json`
 
 ### Vendor Configuration
-Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code. Three generic vendor slots allow connecting to any OpenAI-compatible API.
+Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code. Three generic vendor slots allow connecting to any OpenAI-compatible API. A YAML-configured generic vendor allows connecting to any LLM API with fully custom HTTP request/response formats, optional OAuth/IAM token exchange, and configurable model listing.
 
 ### System Prompt
 The base system prompt is loaded from `resources/system_prompt.md` at startup. Edit this file to customize the AI's default behavior, supported output formats, and instructions across all vendors. The system prompt is automatically combined with agent and translation instructions as needed.
@@ -223,6 +224,7 @@ Output files are placed in the `dist/` folder.
 - [KaTeX](https://katex.org) — LaTeX math rendering
 - [highlight.js](https://highlightjs.org) — Code syntax highlighting
 - [Mermaid](https://mermaid.js.org) — Diagram and chart rendering
+- [js-yaml](https://github.com/nodeca/js-yaml) — YAML parsing for Generic (YAML) vendor configuration
 
 ---
 

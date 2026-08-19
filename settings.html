@@ -118,6 +118,11 @@
     <label style="margin-top:8px;">Endpoint URL</label>
     <input id="generic-endpoint" type="text" placeholder="https://api.example.com/v1">
   </div>
+  <div id="generic-yaml-section" style="display:none;">
+    <label>API Key / Token</label>
+    <input id="generic-yaml-api-key" type="password" placeholder="Enter API key or token…">
+    <button id="generic-yaml-configure-btn" style="margin-top:8px;padding:6px 14px;border-radius:6px;border:none;background:#0a84ff;color:#fff;cursor:pointer;font-size:13px;">Configure YAML…</button>
+  </div>
 
   <!-- Agent Settings -->
   <h1>Agent Settings</h1>
@@ -377,12 +382,14 @@
       const microsoftSection = document.getElementById("microsoft-section");
       const ibmSection = document.getElementById("ibm-section");
       const genericSection = document.getElementById("generic-section");
+      const genericYamlSection = document.getElementById("generic-yaml-section");
       const apiKeyNote = document.getElementById("api-key-note");
       apiKeySection.style.display = "none";
       amazonSection.style.display = "none";
       microsoftSection.style.display = "none";
       ibmSection.style.display = "none";
       genericSection.style.display = "none";
+      genericYamlSection.style.display = "none";
       if (vendor === "amazon") {
         amazonSection.style.display = "";
         document.getElementById("amazon-access-key").value = current.apiKeys.amazonAccessKey || "";
@@ -400,6 +407,9 @@
         document.getElementById("ibm-endpoint").value = current.apiKeys.ibmEndpoint || "";
         document.getElementById("ibm-project-id").value = current.apiKeys.ibmProjectId || "";
         document.getElementById("ibm-key-link").href = vendors[vendor].apiKeyUrl || "#";
+      } else if (vendor === "generic") {
+        genericYamlSection.style.display = "";
+        document.getElementById("generic-yaml-api-key").value = current.apiKeys.genericYamlApiKey || "";
       } else if (vendor.startsWith("generic")) {
         genericSection.style.display = "";
         document.getElementById("generic-api-key").value = current.apiKeys[vendor + "ApiKey"] || "";
@@ -426,6 +436,9 @@
         const ibmKey = current.apiKeys.ibmApiKey || "";
         const ibmEndpoint = current.apiKeys.ibmEndpoint || "";
         if (ibmKey && ibmEndpoint) models = await ipcRenderer.invoke("get-models-for-vendor", "ibm");
+      } else if (vendor === "generic") {
+        const gKey = current.apiKeys.genericYamlApiKey || "";
+        if (gKey) models = await ipcRenderer.invoke("get-models-for-vendor", "generic");
       } else if (vendor.startsWith("generic")) {
         const gKey = current.apiKeys[vendor + "ApiKey"] || "";
         const gEndpoint = current.apiKeys[vendor + "Endpoint"] || "";
@@ -450,7 +463,9 @@
       current.defaultModels[vendorSel.dataset.prev] = modelSel.value;
       // Save outgoing vendor's credentials
       const prev = vendorSel.dataset.prev;
-      if (prev.startsWith("generic")) {
+      if (prev === "generic") {
+        current.apiKeys.genericYamlApiKey = document.getElementById("generic-yaml-api-key").value;
+      } else if (prev.startsWith("generic")) {
         current.apiKeys[prev + "ApiKey"]   = document.getElementById("generic-api-key").value;
         current.apiKeys[prev + "Endpoint"] = document.getElementById("generic-endpoint").value;
       } else if (prev === "microsoft") {
@@ -469,7 +484,7 @@
       }
       // Load saved model and API key for the new vendor, or clear if not set
       modelSel.innerHTML = "";
-      if (vendorSel.value !== "amazon" && vendorSel.value !== "microsoft" && vendorSel.value !== "ibm" && !vendorSel.value.startsWith("generic")) {
+      if (vendorSel.value !== "amazon" && vendorSel.value !== "microsoft" && vendorSel.value !== "ibm" && vendorSel.value !== "generic" && !vendorSel.value.startsWith("generic")) {
         apiKeyIn.value = current.apiKeys[vendorSel.value] || "";
       }
       updateLink(vendorSel.value);
@@ -500,6 +515,17 @@
       current.apiKeys[vendorSel.value + "Endpoint"] = document.getElementById("generic-endpoint").value;
       clearTimeout(genericTimer);
       genericTimer = setTimeout(() => populateModels(vendorSel.value), 800);
+    });
+
+    // re-fetch models when generic YAML API key changes
+    let genericYamlTimer;
+    document.getElementById("generic-yaml-api-key").addEventListener("input", () => {
+      current.apiKeys.genericYamlApiKey = document.getElementById("generic-yaml-api-key").value;
+      clearTimeout(genericYamlTimer);
+      genericYamlTimer = setTimeout(() => populateModels(vendorSel.value), 800);
+    });
+    document.getElementById("generic-yaml-configure-btn").addEventListener("click", () => {
+      ipcRenderer.invoke("open-generic-yaml-editor");
     });
 
     apiKeyLink.addEventListener("click", e => {
@@ -533,7 +559,7 @@
     });
 
     document.getElementById("save-btn").addEventListener("click", () => {
-      if (vendorSel.value !== "amazon" && vendorSel.value !== "microsoft" && vendorSel.value !== "ibm" && !vendorSel.value.startsWith("generic")) current.apiKeys[vendorSel.value] = apiKeyIn.value;
+      if (vendorSel.value !== "amazon" && vendorSel.value !== "microsoft" && vendorSel.value !== "ibm" && vendorSel.value !== "generic" && !vendorSel.value.startsWith("generic")) current.apiKeys[vendorSel.value] = apiKeyIn.value;
       current.defaultModels[vendorSel.value] = modelSel.value;
       current.apiKeys["brave"] = document.getElementById("brave-api-key").value;
       // Persist credentials for the currently visible vendor section
@@ -548,6 +574,8 @@
         current.apiKeys.ibmApiKey   = document.getElementById("ibm-api-key").value;
         current.apiKeys.ibmEndpoint = document.getElementById("ibm-endpoint").value;
         current.apiKeys.ibmProjectId = document.getElementById("ibm-project-id").value;
+      } else if (vendorSel.value === "generic") {
+        current.apiKeys.genericYamlApiKey = document.getElementById("generic-yaml-api-key").value;
       } else if (vendorSel.value.startsWith("generic")) {
         current.apiKeys[vendorSel.value + "ApiKey"]   = document.getElementById("generic-api-key").value;
         current.apiKeys[vendorSel.value + "Endpoint"] = document.getElementById("generic-endpoint").value;

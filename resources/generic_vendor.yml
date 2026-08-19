@@ -1,0 +1,79 @@
+# Generic LLM Vendor Configuration
+# Variables: ${AUTH_TOKEN}, ${MODEL}, ${PROMPT}, ${MESSAGES}, ${GUID}
+#            ${MESSAGES_NO_SYSTEM}, ${SYSTEM_PROMPT}
+#
+# ${AUTH_TOKEN}          - API key from the Settings dialog
+# ${MODEL}              - Selected model from the Settings dialog
+# ${PROMPT}             - The current user message (JSON-escaped)
+# ${MESSAGES}           - Full conversation history as JSON array
+# ${MESSAGES_NO_SYSTEM} - Conversation history excluding system messages
+# ${SYSTEM_PROMPT}      - Content of the system message (JSON-escaped)
+# ${GUID}              - Conversation GUID (regenerated on Clear)
+#
+# ConversationMode:
+#   single-shot - sends only the current prompt with a conversation GUID
+#                 for server-side history tracking. Uses ${PROMPT} and ${GUID}.
+#   multi-turn  - sends the full conversation history. Uses ${MESSAGES}
+#                 which expands to a JSON array of {role, content} objects.
+
+Prompt:
+  URI: https://example.com/api/conversation
+  Method: POST
+  Headers:
+    Content-Type: application/json
+    Authorization: "Bearer ${AUTH_TOKEN}"
+  ConversationMode: multi-turn
+  Body: |
+    {
+      "model": "${MODEL}",
+      "messages": ${MESSAGES},
+      "temperature": 0,
+      "stream": false
+    }
+  Response:
+    ContentPath: "choices[0].message.content"
+
+# To use single-shot mode instead, change ConversationMode and Body:
+#
+#  ConversationMode: single-shot
+#  Body: |
+#    {
+#      "model": "${MODEL}",
+#      "messages": [
+#        {"role": "system", "content": "${SYSTEM_PROMPT}"},
+#        {"role": "user", "content": "${PROMPT}"}
+#      ],
+#      "temperature": 0,
+#      "conversation_guid": "${GUID}",
+#      "stream": false
+#    }
+
+# Optional: Auth section for OAuth/IAM token exchange.
+# If present, ${AUTH_TOKEN} in Prompt/Models is replaced with the
+# fetched access token instead of the raw API key from Settings.
+# The token is cached until expiry.
+#
+# Auth:
+#   TokenURI: https://iam.cloud.ibm.com/identity/token
+#   Method: POST
+#   Headers:
+#     Content-Type: application/x-www-form-urlencoded
+#   Body: "grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=${AUTH_TOKEN}"
+#   Response:
+#     TokenPath: "access_token"
+#     ExpiresInPath: "expires_in"
+
+Models:
+  URI: https://example.com/api/models
+  Method: GET
+  Headers:
+    Authorization: "Bearer ${AUTH_TOKEN}"
+  Response:
+    # ListPath: JSONPath to the array of models in the response.
+    #   "" (empty) = response body is the array itself, e.g. [{...}, ...]
+    #   "data"     = array is in the "data" field, e.g. {"data": [...]}
+    #   "models"   = array is in the "models" field
+    #   "result.models" = nested path, e.g. {"result": {"models": [...]}}
+    ListPath: "data"
+    IdField: "id"
+    DescriptionField: ""

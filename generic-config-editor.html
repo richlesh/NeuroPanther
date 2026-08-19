@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Generic Vendor Configuration</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, sans-serif;
+      background: #f5f5f5;
+      color: #1e1e1e;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    body.dark { background: #1e1e1e; color: #e0e0e0; }
+
+    .header {
+      margin-bottom: 12px;
+    }
+    .header h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .header p { font-size: 12px; color: #666; }
+    body.dark .header p { color: #999; }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+      color: #1e1e1e;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+    body.dark textarea { background: #2a2a2c; color: #e0e0e0; border-color: #555; }
+    textarea:focus { border-color: #0a84ff; }
+
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .buttons-left { display: flex; gap: 8px; }
+    .buttons-right { display: flex; gap: 8px; }
+
+    button {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #reset-btn { background: #ffcc00; color: #1e1e1e; }
+    #reset-btn:hover { background: #e6b800; }
+    #cancel-btn { background: #ddd; color: #1e1e1e; }
+    body.dark #cancel-btn { background: #3a3a3c; color: #e0e0e0; }
+    #cancel-btn:hover { background: #ccc; }
+    body.dark #cancel-btn:hover { background: #4a4a4e; }
+    #save-btn { background: #0a84ff; color: #fff; }
+    #save-btn:hover { background: #0070e0; }
+
+    .status { font-size: 12px; color: #28a745; margin-top: 8px; display: none; }
+    body.dark .status { color: #5fcf6a; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>YAML Configuration</h2>
+    <p>Variables: ${AUTH_TOKEN}, ${MODEL}, ${PROMPT}, ${MESSAGES}, ${MESSAGES_NO_SYSTEM}, ${SYSTEM_PROMPT}, ${GUID}</p>
+  </div>
+  <textarea id="yaml-editor" spellcheck="false"></textarea>
+  <div class="status" id="status-msg">Saved successfully.</div>
+  <div class="buttons">
+    <div class="buttons-left">
+      <button id="reset-btn">Reset to Defaults</button>
+    </div>
+    <div class="buttons-right">
+      <button id="cancel-btn">Cancel</button>
+      <button id="save-btn">Save</button>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+
+    const yamlEditor = document.getElementById("yaml-editor");
+    const statusMsg = document.getElementById("status-msg");
+    let originalContent = "";
+
+    // Apply dark mode
+    ipcRenderer.on("set-theme", (_e, theme) => {
+      if (theme === "dark") document.body.classList.add("dark");
+      else document.body.classList.remove("dark");
+    });
+
+    // Load YAML content from main process
+    ipcRenderer.on("load-yaml", (_e, content) => {
+      yamlEditor.value = content;
+      originalContent = content;
+    });
+
+    // Handle Tab key for indentation
+    yamlEditor.addEventListener("keydown", (e) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const start = yamlEditor.selectionStart;
+        const end = yamlEditor.selectionEnd;
+        yamlEditor.value = yamlEditor.value.substring(0, start) + "  " + yamlEditor.value.substring(end);
+        yamlEditor.selectionStart = yamlEditor.selectionEnd = start + 2;
+      }
+    });
+
+    document.getElementById("save-btn").addEventListener("click", () => {
+      ipcRenderer.invoke("save-generic-yaml", yamlEditor.value);
+      ipcRenderer.invoke("close-generic-yaml-editor");
+    });
+
+    document.getElementById("cancel-btn").addEventListener("click", () => {
+      ipcRenderer.invoke("close-generic-yaml-editor");
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      if (confirm("Reset YAML to the default template? This will discard your changes.")) {
+        ipcRenderer.invoke("get-generic-yaml-default").then((defaultYaml) => {
+          yamlEditor.value = defaultYaml;
+        });
+      }
+    });
+  </script>
+</body>
+</html>

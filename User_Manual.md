@@ -1,6 +1,6 @@
 # NeuroPanther Chat User Manual
 
-**Version:** 1.8.0  
+**Version:** 1.9.0  
 **Product:** NeuroPanther Chat  
 **Author:** Richard Lesh / Glowing Cat Software
 
@@ -209,6 +209,121 @@ NeuroPanther Chat expects Ollama to be available at:
 http://localhost:11434/v1
 ```
 
+### Generic 1/2/3 (OpenAI-Compatible)
+
+Three generic vendor slots allow connecting to any API that uses the OpenAI-compatible format. For each slot, enter:
+
+- **API Key** — your key or token for the service.
+- **Endpoint URL** — the base URL of the OpenAI-compatible API (e.g., `https://api.example.com/v1`).
+
+Models are fetched automatically from the endpoint's `/models` route.
+
+### Generic (YAML)
+
+The Generic (YAML) vendor allows connecting to any LLM API — not just OpenAI-compatible ones — by defining the HTTP request and response format in a YAML configuration file.
+
+To set up the Generic (YAML) vendor:
+
+1. Select **Generic (YAML)** as the vendor in Settings.
+2. Enter your **API Key / Token** for the target service.
+3. Click **Configure YAML…** to open the YAML editor.
+4. Edit the YAML configuration to match your LLM provider's API format.
+5. Click **Save** in the YAML editor.
+6. Models should appear in the Model dropdown (if a Models section is configured).
+
+The YAML configuration file is stored at:
+
+```text
+~/.neuropanther-chat-generic.yml
+```
+
+#### YAML Configuration Sections
+
+The YAML file supports these sections:
+
+| Section | Purpose |
+|---------|---------|
+| **Prompt** | Defines the chat/prompt API endpoint — URI, method, headers, body template, and response extraction path. |
+| **Models** | Defines how to fetch available models — URI, method, headers, and response parsing. |
+| **Auth** | (Optional) Defines an OAuth/IAM token exchange flow. If present, the raw API key is exchanged for an access token before API calls. |
+
+#### Template Variables
+
+The following variables are substituted in URI, headers, and body templates:
+
+| Variable | Description |
+|----------|-------------|
+| `${AUTH_TOKEN}` | The API key from Settings (or the exchanged access token if Auth is configured). |
+| `${MODEL}` | The selected model from the Model dropdown. |
+| `${PROMPT}` | The current user message (JSON-escaped). |
+| `${MESSAGES}` | Full conversation history as a JSON array of `{role, content}` objects. |
+| `${MESSAGES_NO_SYSTEM}` | Conversation history excluding system messages. |
+| `${SYSTEM_PROMPT}` | The content of the system message (JSON-escaped). |
+| `${GUID}` | A conversation GUID (regenerated when the chat is cleared). |
+
+#### Conversation Modes
+
+The `ConversationMode` setting in the Prompt section controls how messages are sent:
+
+- **multi-turn** — Sends the full conversation history using `${MESSAGES}`. This is the default.
+- **single-shot** — Sends only the current user prompt using `${PROMPT}` and a `${GUID}` for server-side history tracking.
+
+#### Response Parsing
+
+The `Response.ContentPath` field uses a JSONPath-like expression to extract the AI response from the API's JSON response body. Examples:
+
+- `choices[0].message.content` — standard OpenAI format
+- `result.text` — a custom response format
+- (empty) — returns the entire response body as-is
+
+#### Auth Token Exchange
+
+If your API requires an OAuth or IAM token exchange (e.g., IBM watsonx), configure the **Auth** section:
+
+```yaml
+Auth:
+  TokenURI: https://iam.cloud.ibm.com/identity/token
+  Method: POST
+  Headers:
+    Content-Type: application/x-www-form-urlencoded
+  Body: "grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=${AUTH_TOKEN}"
+  Response:
+    TokenPath: "access_token"
+    ExpiresInPath: "expires_in"
+```
+
+The exchanged token is cached until expiry, so repeated API calls do not require repeated token exchanges.
+
+#### Example: OpenAI-Compatible API
+
+```yaml
+Prompt:
+  URI: https://api.example.com/v1/chat/completions
+  Method: POST
+  Headers:
+    Content-Type: application/json
+    Authorization: "Bearer ${AUTH_TOKEN}"
+  ConversationMode: multi-turn
+  Body: |
+    {
+      "model": "${MODEL}",
+      "messages": ${MESSAGES},
+      "temperature": 0,
+      "stream": false
+    }
+  Response:
+    ContentPath: "choices[0].message.content"
+
+Models:
+  URI: https://api.example.com/v1/models
+  Method: GET
+  Headers:
+    Authorization: "Bearer ${AUTH_TOKEN}"
+  Response:
+    ListPath: "data"
+    IdField: "id"
+```
+
 ---
 
 ## Choosing a Vendor and Model
@@ -226,6 +341,8 @@ Supported configured vendors include:
 - Stability AI
 - Leonardo
 - Ideogram
+- Generic 1/2/3 (OpenAI-compatible)
+- Generic (YAML)
 - Ollama
 
 Not all vendors support every feature. For example, some vendors are chat providers, while others are image-only providers.
@@ -240,6 +357,8 @@ Common chat vendors include:
 - DeepSeek
 - Alibaba
 - Meta
+- Generic 1/2/3 (OpenAI-compatible endpoints)
+- Generic (YAML) (any LLM API with custom configuration)
 - Ollama
 
 ### Image Generation Vendors
@@ -687,6 +806,18 @@ Check that the file path is inside the configured working directory. Agent tools
 ### Agent web search fails
 
 Add a Brave Search API key in Settings.
+
+### Generic (YAML) vendor returns an error
+
+Check the following:
+
+1. The YAML configuration is valid YAML (correct indentation, no syntax errors).
+2. The URI, headers, and body match your target API's requirements.
+3. The `Response.ContentPath` correctly points to the response text in the API's JSON response.
+4. If using Auth token exchange, verify the `TokenURI`, `Body`, and `Response.TokenPath` are correct.
+5. Ensure the API key is entered in Settings.
+
+You can click **Reset to Defaults** in the YAML editor to restore the default template and start over.
 
 ### A response stops or errors
 

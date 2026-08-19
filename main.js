@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const nodeCrypto = require("crypto");
 const { load, save, VENDORS } = require("./settings");
 const { expectedLicenseKey, isValidLicense } = require("./utilities.js");
+const genericVendorConfig = require("./generic-vendor-config");
 
 function openExternal(url) {
   if (process.platform === "linux") {
@@ -452,7 +453,7 @@ ipcMain.handle("fetch-models", async (_event, { vendor, apiKey, baseURL }) => {
 ipcMain.handle("get-models-for-vendor", async (_event, vendor) => {
   const { apiKeys } = load();
   const apiKey = apiKeys?.[vendor] || "";
-  if (!apiKey && vendor !== "ollama" && vendor !== "amazon" && vendor !== "microsoft" && vendor !== "ibm" && !vendor.startsWith("generic")) return null;
+  if (!apiKey && vendor !== "ollama" && vendor !== "amazon" && vendor !== "microsoft" && vendor !== "ibm" && vendor !== "generic" && !vendor.startsWith("generic")) return null;
   if (vendor === "amazon") {
     if (!apiKeys?.amazonAccessKey || !apiKeys?.amazonSecretKey) return null;
     return VENDORS[vendor]?.models || null;
@@ -480,6 +481,17 @@ ipcMain.handle("get-models-for-vendor", async (_event, vendor) => {
       return models.length ? models : VENDORS[vendor]?.models || null;
     } catch {
       return VENDORS[vendor]?.models || null;
+    }
+  }
+  if (vendor === "generic") {
+    const gApiKey = apiKeys?.genericYamlApiKey || "";
+    if (!gApiKey) return null;
+    try {
+      genericVendorConfig.load();
+      const models = await genericVendorConfig.fetchModels(gApiKey);
+      return models.length ? models : null;
+    } catch {
+      return null;
     }
   }
   if (vendor.startsWith("generic")) {
@@ -548,6 +560,45 @@ ipcMain.handle("settings-save", (_e, newSettings) => {
 });
 
 ipcMain.handle("settings-cancel", () => settingsWin?.close());
+
+// ── Generic (YAML) vendor editor ──────────────────────────────────────────────
+let genericEditorWin;
+
+ipcMain.handle("open-generic-yaml-editor", () => {
+  if (genericEditorWin) { genericEditorWin.focus(); return; }
+  genericEditorWin = new BrowserWindow({
+    width: 700,
+    height: 600,
+    resizable: true,
+    icon: appIcon,
+    parent: settingsWin || undefined,
+    modal: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false }
+  });
+  genericEditorWin.setMenuBarVisibility(false);
+  genericEditorWin.loadFile("generic-config-editor.html");
+  genericEditorWin.webContents.once("did-finish-load", () => {
+    const settings = load();
+    const theme = settings.theme || "system";
+    const isDark = theme === "dark";
+    genericEditorWin.webContents.send("set-theme", isDark ? "dark" : "light");
+    genericEditorWin.webContents.send("load-yaml", genericVendorConfig.loadYamlString());
+  });
+  genericEditorWin.on("closed", () => { genericEditorWin = null; });
+});
+
+ipcMain.handle("save-generic-yaml", (_e, yamlStr) => {
+  genericVendorConfig.saveYamlString(yamlStr);
+  genericVendorConfig.load();
+});
+
+ipcMain.handle("close-generic-yaml-editor", () => {
+  genericEditorWin?.close();
+});
+
+ipcMain.handle("get-generic-yaml-default", () => {
+  return genericVendorConfig.DEFAULT_YAML;
+});
 
 ipcMain.handle("open-external", (_e, url) => openExternal(url));
 
@@ -762,14 +813,19 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
     baseURL = `${endpoint}/ml/gateway/v1`;
     defaultHeaders = { ...(projectId ? { "X-IBM-Project-Id": projectId } : {}) };
   }
+  // Generic (YAML) vendor: use non-streaming call via generic-vendor-config
+  if (vendor === "generic") {
+    apiKey = settings.apiKeys?.genericYamlApiKey || "";
+    if (!apiKey) { event.sender.send("stream-error", sid, "You need to set the API Key in Settings before the Generic (YAML) vendor can be used."); return; }
+  }
   // Generic vendors: resolve credentials
-  if (vendor.startsWith("generic")) {
+  if (vendor.startsWith("generic") && vendor !== "generic") {
     apiKey = settings.apiKeys?.[vendor + "ApiKey"] || "";
     const endpoint = (settings.apiKeys?.[vendor + "Endpoint"] || "").replace(/\/+$/, "");
     if (!apiKey || !endpoint) { event.sender.send("stream-error", sid, "You need to set API Key and Endpoint in Settings before this vendor can be used."); return; }
     baseURL = endpoint;
   }
-  if (!apiKey && vendor !== "ollama" && vendor !== "amazon" && vendor !== "microsoft" && vendor !== "ibm" && !vendor.startsWith("generic")) { event.sender.send("stream-error", sid, "You need to set the API key in Settings before this LLM vendor can be used."); return; }
+  if (!apiKey && vendor !== "ollama" && vendor !== "amazon" && vendor !== "microsoft" && vendor !== "ibm" && vendor !== "generic" && !vendor.startsWith("generic")) { event.sender.send("stream-error", sid, "You need to set the API key in Settings before this LLM vendor can be used."); return; }
 
   const tools = agentMode ? (vendor === "anthropic" ? ANTHROPIC_TOOLS : AGENT_TOOLS) : undefined;
 
@@ -778,6 +834,16 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
   const useNonStreaming = vendor === "google" && hasToolResults;
 
   try {
+    if (vendor === "generic") {
+      // Generic (YAML) vendor — non-streaming via custom HTTP
+      genericVendorConfig.load();
+      const lastPrompt = [...messages].reverse().find(m => m.role === "user")?.content || "";
+      const plainMessages = messages.map(m => ({ role: m.role, content: typeof m.content === "string" ? m.content : (Array.isArray(m.content) ? m.content.map(p => p.text || "").join("") : "") }));
+      const content = await genericVendorConfig.callPrompt(apiKey, model, lastPrompt, plainMessages);
+      event.sender.send("stream-done", sid, content || "");
+      delete activeAborts[sid];
+      return;
+    }
     if (vendor === "amazon") {
       const amazonAccessKey = settings.apiKeys?.amazonAccessKey || "";
       const amazonSecretKey = settings.apiKeys?.amazonSecretKey || "";
@@ -1045,7 +1111,16 @@ ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model:
     apiKey = settings.apiKeys?.microsoftApiKey || "";
     if (!apiKey || !settings.apiKeys?.microsoftEndpoint) throw new Error("You need to set Azure API Key and Endpoint in Settings before Microsoft can be used.");
   }
-  if (!apiKey && vendor !== "ollama" && vendor !== "amazon" && vendor !== "microsoft" && vendor !== "ibm" && !vendor.startsWith("generic")) throw new Error("You need to set the API key in Settings before this LLM vendor can be used.");
+  if (!apiKey && vendor !== "ollama" && vendor !== "amazon" && vendor !== "microsoft" && vendor !== "ibm" && vendor !== "generic" && !vendor.startsWith("generic")) throw new Error("You need to set the API key in Settings before this LLM vendor can be used.");
+
+  if (vendor === "generic") {
+    apiKey = settings.apiKeys?.genericYamlApiKey || "";
+    if (!apiKey) throw new Error("You need to set the API Key in Settings before the Generic (YAML) vendor can be used.");
+    genericVendorConfig.load();
+    const lastPrompt = [...messages].reverse().find(m => m.role === "user")?.content || "";
+    const plainMessages = messages.map(m => ({ role: m.role, content: typeof m.content === "string" ? m.content : (Array.isArray(m.content) ? m.content.map(p => p.text || "").join("") : "") }));
+    return await genericVendorConfig.callPrompt(apiKey, model, lastPrompt, plainMessages);
+  }
 
   if (vendor === "amazon") {
     const amazonAccessKey = settings.apiKeys?.amazonAccessKey || "";
@@ -1113,7 +1188,7 @@ ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model:
   } else if (vendor === "ibm") {
     apiKey = settings.apiKeys?.ibmApiKey || "";
     chatBaseURL = `${(settings.apiKeys?.ibmEndpoint || "").replace(/\/+$/, "")}/ml/gateway/v1`;
-  } else if (vendor.startsWith("generic")) {
+  } else if (vendor.startsWith("generic") && vendor !== "generic") {
     apiKey = settings.apiKeys?.[vendor + "ApiKey"] || "";
     chatBaseURL = (settings.apiKeys?.[vendor + "Endpoint"] || "").replace(/\/+$/, "");
   } else {
@@ -1683,11 +1758,27 @@ if (process.platform === "linux") {
 }
 
 app.whenReady().then(() => {
+  // Copy config examples to Desktop on first launch
+  const desktopConfigDir = path.join(require("os").homedir(), "Desktop", "AI Config Examples");
+  if (!fs.existsSync(desktopConfigDir)) {
+    const sourceConfigDir = path.join(__dirname, "config");
+    if (fs.existsSync(sourceConfigDir)) {
+      try {
+        fs.mkdirSync(desktopConfigDir, { recursive: true });
+        for (const file of fs.readdirSync(sourceConfigDir)) {
+          fs.copyFileSync(path.join(sourceConfigDir, file), path.join(desktopConfigDir, file));
+        }
+      } catch {
+        // Silently fail — non-critical
+      }
+    }
+  }
+
   // Intercept every window's close to check for unsaved tabs
   app.on("browser-window-created", (_e, win) => {
     win.on("close", (e) => {
       if (isQuitting) return;
-      if (["settings", "about", "splash", "license"].some(p => win.webContents.getURL().includes(p))) return;
+      if (["settings", "about", "splash", "license", "generic-config-editor"].some(p => win.webContents.getURL().includes(p))) return;
       if (windowsAwaitingClose.has(win.id)) {
         windowsAwaitingClose.delete(win.id);
         return; // confirmed — allow close
