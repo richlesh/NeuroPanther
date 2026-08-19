@@ -1945,57 +1945,81 @@
     }
 
     function renderAssistantContent(el, reply, vendor) {
-      el.classList.remove("thinking-indicator");
-      el.innerHTML = "";
       let text = reply || "";
       const supportsThinking = true;
-      if (supportsThinking && displayModelActivity) {
-        // Normalize Google Gemini <thought> tags to <think> for consistent handling
-        text = text.replace(/<thought>/gi, "<think>").replace(/<\/thought>/gi, "</think>");
-        const lower = text.toLowerCase();
-        let pos = 0;
-        while (pos < text.length) {
-          const start = lower.indexOf("<think>", pos);
-          if (start === -1) {
-            const contentText = text.slice(pos);
-            if (contentText || !el.children.length) {
-              const content = document.createElement("div");
-              content.innerHTML = replaceEmoji(marked.parse(contentText || text));
-              el.appendChild(content);
-            }
-            break;
-          }
-          const before = text.slice(pos, start);
-          if (before) {
-            const content = document.createElement("div");
-            content.innerHTML = replaceEmoji(marked.parse(before));
-            el.appendChild(content);
-          }
-          const bodyStart = start + "<think>".length;
-          const end = lower.indexOf("</think>", bodyStart);
-          const isOpen = end === -1;
-          const thinkText = isOpen ? text.slice(bodyStart) : text.slice(bodyStart, end);
-          const think = document.createElement("div");
-          think.className = "think-block";
-          const title = document.createElement("div");
-          title.className = "think-block-title";
-          title.textContent = isOpen ? "Model thinking…" : "Model thinking";
-          const body = document.createElement("div");
-          body.className = "think-block-body";
-          body.innerHTML = replaceEmoji(marked.parse(thinkText.trim() || "…"));
-          think.append(title, body);
-          el.appendChild(think);
-          if (isOpen) break;
-          pos = end + "</think>".length;
-        }
-      } else {
-        // Strip thinking/reasoning content when Display Model Activity is off
+
+      // When Display Model Activity is off, strip thinking content
+      if (!(supportsThinking && displayModelActivity)) {
         let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
         cleaned = cleaned.replace(/<thought>[\s\S]*?<\/thought>/gi, "");
-        // Handle unclosed thinking blocks (still streaming)
+        // Handle unclosed thinking blocks (still streaming) — strip from <think> to end
         cleaned = cleaned.replace(/<think>[\s\S]*/gi, "");
         cleaned = cleaned.replace(/<thought>[\s\S]*/gi, "");
-        el.innerHTML = replaceEmoji(marked.parse(cleaned.trim() || text));
+        cleaned = cleaned.trim();
+        if (!cleaned) {
+          // All content so far is thinking — keep the thinking indicator as-is
+          if (!el.classList.contains("thinking-indicator")) {
+            el.classList.add("thinking-indicator");
+            el.innerHTML = "";
+            const img = document.createElement("img");
+            img.src = "resources/app_icon.png";
+            el.appendChild(img);
+            const span = document.createElement("span");
+            span.className = "thinking-text";
+            span.textContent = "Thinking...";
+            el.appendChild(span);
+          }
+          return;
+        }
+        // Has real content — render it without thinking blocks
+        el.classList.remove("thinking-indicator");
+        el.innerHTML = replaceEmoji(marked.parse(cleaned));
+        addCodeCopyButtons(el);
+        addTableToolbars(el);
+        addMathBlockToolbars(el);
+        return;
+      }
+
+      // Display Model Activity is ON — show thinking blocks
+      el.classList.remove("thinking-indicator");
+      el.innerHTML = "";
+      // Normalize Google Gemini <thought> tags to <think> for consistent handling
+      text = text.replace(/<thought>/gi, "<think>").replace(/<\/thought>/gi, "</think>");
+      const lower = text.toLowerCase();
+      let pos = 0;
+      while (pos < text.length) {
+        const start = lower.indexOf("<think>", pos);
+        if (start === -1) {
+          const contentText = text.slice(pos);
+          if (contentText || !el.children.length) {
+            const content = document.createElement("div");
+            content.innerHTML = replaceEmoji(marked.parse(contentText || text));
+            el.appendChild(content);
+          }
+          break;
+        }
+        const before = text.slice(pos, start);
+        if (before) {
+          const content = document.createElement("div");
+          content.innerHTML = replaceEmoji(marked.parse(before));
+          el.appendChild(content);
+        }
+        const bodyStart = start + "<think>".length;
+        const end = lower.indexOf("</think>", bodyStart);
+        const isOpen = end === -1;
+        const thinkText = isOpen ? text.slice(bodyStart) : text.slice(bodyStart, end);
+        const think = document.createElement("div");
+        think.className = "think-block";
+        const title = document.createElement("div");
+        title.className = "think-block-title";
+        title.textContent = isOpen ? "Model thinking…" : "Model thinking";
+        const body = document.createElement("div");
+        body.className = "think-block-body";
+        body.innerHTML = replaceEmoji(marked.parse(thinkText.trim() || "…"));
+        think.append(title, body);
+        el.appendChild(think);
+        if (isOpen) break;
+        pos = end + "</think>".length;
       }
       addCodeCopyButtons(el);
       addTableToolbars(el);
