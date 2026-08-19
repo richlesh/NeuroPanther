@@ -780,6 +780,7 @@ const ANTHROPIC_TOOLS = AGENT_TOOLS.map(t => ({
 }));
 
 const activeAborts = {}; // sid → AbortController
+const thinkingDisabled = new Set(); // tracks "vendor:model" keys where thinking is unsupported
 
 ipcMain.on("cancel-stream", (_event, sid) => {
   if (activeAborts[sid]) {
@@ -788,7 +789,7 @@ ipcMain.on("cancel-stream", (_event, sid) => {
   }
 });
 
-ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, sid }) => {
+async function handleChatStream(event, { messages, vendor, model, agentMode, sid }) {
   const abortController = new AbortController();
   activeAborts[sid] = abortController;
   checkMessageNag();
@@ -903,7 +904,7 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
         }))
       } : undefined;
       // Only enable thinking for Claude models that support it (Sonnet 3.7+, Opus 4+)
-      const supportsBedrockThinking = /anthropic\.claude-(sonnet|opus)/i.test(model);
+      const supportsBedrockThinking = /anthropic\.claude-(sonnet|opus)/i.test(model) && !thinkingDisabled.has(`${vendor}:${model}`);
       const command = new ConverseStreamCommand({
         modelId: model,
         messages: amazonMessages,
@@ -983,11 +984,12 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
         }
         return m;
       });
+      const anthropicThinking = !thinkingDisabled.has(`${vendor}:${model}`) ? { thinking: { type: "adaptive", display: "summarized" } } : {};
       const stream = await client.messages.stream({
         model, max_tokens: 128000,
         system: sysMsg?.content,
         messages: userMsgs,
-        thinking: { type: "adaptive", display: "summarized" },
+        ...anthropicThinking,
         ...(tools ? { tools } : {})
       }, { signal: abortController.signal });
       let fullText = "";
@@ -1134,13 +1136,20 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
   } catch (err) {
     if (abortController.signal.aborted) {
       event.sender.send("stream-error", sid, "cancelled");
+    } else if (/think/i.test(err.message) && !thinkingDisabled.has(`${vendor}:${model}`)) {
+      // Thinking parameter caused an error — disable it for this vendor:model and retry silently
+      thinkingDisabled.add(`${vendor}:${model}`);
+      delete activeAborts[sid];
+      handleChatStream(event, { messages, vendor, model, agentMode, sid });
+      return;
     } else {
       event.sender.send("stream-error", sid, err.message);
     }
   } finally {
     delete activeAborts[sid];
   }
-});
+}
+ipcMain.on("chat-stream", handleChatStream);
 
 ipcMain.handle("copy-to-clipboard", (_e, text) => {
   const { clipboard } = require("electron");
