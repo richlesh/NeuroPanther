@@ -794,6 +794,7 @@ async function handleChatStream(event, { messages, vendor, model, agentMode, sid
   activeAborts[sid] = abortController;
   checkMessageNag();
   const settings = load();
+  const displayModelActivity = settings.displayModelActivity !== false;
   let apiKey = settings.apiKeys?.[vendor] || "";
   let baseURL = VENDORS[vendor]?.baseURL;
   let defaultHeaders;
@@ -904,7 +905,7 @@ async function handleChatStream(event, { messages, vendor, model, agentMode, sid
         }))
       } : undefined;
       // Only enable thinking for Claude models that support it (Sonnet 3.7+, Opus 4+)
-      const supportsBedrockThinking = /anthropic\.claude-(sonnet|opus)/i.test(model) && !thinkingDisabled.has(`${vendor}:${model}`);
+      const supportsBedrockThinking = displayModelActivity && /anthropic\.claude-(sonnet|opus)/i.test(model) && !thinkingDisabled.has(`${vendor}:${model}`);
       const command = new ConverseStreamCommand({
         modelId: model,
         messages: amazonMessages,
@@ -984,7 +985,7 @@ async function handleChatStream(event, { messages, vendor, model, agentMode, sid
         }
         return m;
       });
-      const anthropicThinking = !thinkingDisabled.has(`${vendor}:${model}`) ? { thinking: { type: "adaptive", display: "summarized" } } : {};
+      const anthropicThinking = displayModelActivity && !thinkingDisabled.has(`${vendor}:${model}`) ? { thinking: { type: "adaptive", display: "summarized" } } : {};
       const stream = await client.messages.stream({
         model, max_tokens: 128000,
         system: sysMsg?.content,
