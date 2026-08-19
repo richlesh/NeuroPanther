@@ -907,10 +907,12 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
         messages: amazonMessages,
         ...(systemPrompt ? { system: [{ text: systemPrompt.content }] } : {}),
         ...(amazonToolConfig ? { toolConfig: amazonToolConfig } : {}),
-        inferenceConfig: { maxTokens: 4096 }
+        inferenceConfig: { maxTokens: 4096 },
+        additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 4096 } }
       });
       const response = await client.send(command, { abortSignal: abortController.signal });
       let fullText = "";
+      let inBedrockThinking = false;
       const toolUseBlocks = [];
       let currentToolUse = null;
       for await (const item of response.stream) {
@@ -919,10 +921,26 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
         } else if (item.contentBlockDelta) {
           if (item.contentBlockDelta.delta?.toolUse) {
             if (currentToolUse) currentToolUse.argsRaw += item.contentBlockDelta.delta.toolUse.input || "";
+          } else if (item.contentBlockDelta.delta?.reasoningContent?.text) {
+            if (!inBedrockThinking) {
+              inBedrockThinking = true;
+              fullText += "<think>";
+              event.sender.send("stream-chunk", sid, "<think>");
+            }
+            const thinkText = item.contentBlockDelta.delta.reasoningContent.text;
+            fullText += thinkText;
+            event.sender.send("stream-chunk", sid, thinkText);
           } else {
             const text = item.contentBlockDelta.delta?.text || "";
-            fullText += text;
-            event.sender.send("stream-chunk", sid, text);
+            if (text) {
+              if (inBedrockThinking) {
+                inBedrockThinking = false;
+                fullText += "</think>";
+                event.sender.send("stream-chunk", sid, "</think>");
+              }
+              fullText += text;
+              event.sender.send("stream-chunk", sid, text);
+            }
           }
         } else if (item.contentBlockStop) {
           if (currentToolUse) {
@@ -930,6 +948,10 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
             currentToolUse = null;
           }
         }
+      }
+      if (inBedrockThinking) {
+        fullText += "</think>";
+        event.sender.send("stream-chunk", sid, "</think>");
       }
       if (toolUseBlocks.length > 0) {
         event.sender.send("stream-tool-calls", sid, toolUseBlocks.map(tc => {
@@ -963,17 +985,37 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
         model, max_tokens: 128000,
         system: sysMsg?.content,
         messages: userMsgs,
+        thinking: { type: "adaptive", display: "summarized" },
         ...(tools ? { tools } : {})
       }, { signal: abortController.signal });
       let fullText = "";
+      let inThinking = false;
       for await (const chunk of stream) {
+        if (chunk.type === "content_block_delta" && chunk.delta.type === "thinking_delta") {
+          if (!inThinking) {
+            inThinking = true;
+            fullText += "<think>";
+            event.sender.send("stream-chunk", sid, "<think>");
+          }
+          fullText += chunk.delta.thinking;
+          event.sender.send("stream-chunk", sid, chunk.delta.thinking);
+        }
         if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+          if (inThinking) {
+            inThinking = false;
+            fullText += "</think>";
+            event.sender.send("stream-chunk", sid, "</think>");
+          }
           fullText += chunk.delta.text;
           event.sender.send("stream-chunk", sid, chunk.delta.text);
         }
         if (chunk.type === "content_block_start" && chunk.content_block?.type === "tool_use") {
           // tool call coming — collect it
         }
+      }
+      if (inThinking) {
+        fullText += "</think>";
+        event.sender.send("stream-chunk", sid, "</think>");
       }
       const finalMsg = await stream.finalMessage();
       const toolUses = finalMsg.content.filter(b => b.type === "tool_use");
@@ -1038,10 +1080,27 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
       const reasoningWithTools = tools && (vendor === "openai");
       const stream = await client.chat.completions.create({ model, messages: openaiMessages, stream: true, ...(tools ? { tools, tool_choice: "auto" } : {}), ...(reasoningWithTools ? { reasoning_effort: "none" } : {}) }, { signal: abortController.signal });
       let fullText = "";
+      let inReasoning = false;
       const toolCallMap = {};
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
+        // Handle reasoning/thinking field from Ollama and DeepSeek (separate from content)
+        const reasoning = delta?.reasoning_content || delta?.reasoning;
+        if (reasoning) {
+          if (!inReasoning) {
+            inReasoning = true;
+            fullText += "<think>";
+            event.sender.send("stream-chunk", sid, "<think>");
+          }
+          fullText += reasoning;
+          event.sender.send("stream-chunk", sid, reasoning);
+        }
         if (delta?.content) {
+          if (inReasoning) {
+            inReasoning = false;
+            fullText += "</think>";
+            event.sender.send("stream-chunk", sid, "</think>");
+          }
           fullText += delta.content;
           event.sender.send("stream-chunk", sid, delta.content);
         }
@@ -1053,6 +1112,11 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, si
             if (tc.function?.arguments) toolCallMap[tc.index].argsRaw += tc.function.arguments;
           }
         }
+      }
+      // Close any unclosed thinking block
+      if (inReasoning) {
+        fullText += "</think>";
+        event.sender.send("stream-chunk", sid, "</think>");
       }
       const toolCalls = Object.values(toolCallMap);
       if (toolCalls.length > 0) {

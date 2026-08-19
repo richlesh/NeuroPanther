@@ -1947,9 +1947,11 @@
     function renderAssistantContent(el, reply, vendor) {
       el.classList.remove("thinking-indicator");
       el.innerHTML = "";
-      const text = reply || "";
-      const supportsThinking = (vendor === "ollama" || vendor === "deepseek");
+      let text = reply || "";
+      const supportsThinking = true;
       if (supportsThinking && displayModelActivity) {
+        // Normalize Google Gemini <thought> tags to <think> for consistent handling
+        text = text.replace(/<thought>/gi, "<think>").replace(/<\/thought>/gi, "</think>");
         const lower = text.toLowerCase();
         let pos = 0;
         while (pos < text.length) {
